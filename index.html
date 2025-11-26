@@ -1,241 +1,458 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Safe Turn</title>
-
-<link rel="manifest" href="./manifest.json" />
-<meta name="theme-color" content="#141414" />
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Safe Turn — GPS + Precache</title>
+<link rel="manifest" href="./manifest.json"/>
+<meta name="theme-color" content="#141414"/>
+<link rel="icon" href="./icons/icon-192.png"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
-    body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #eef2f5;
-    }
-
-    #map {
-        width: 100%;
-        height: 60vh;
-    }
-
-    .container {
-        background: white;
-        padding: 15px;
-        border-radius: 12px;
-        width: 92%;
-        margin: -20px auto 0 auto;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    }
-
-    button {
-        background: #3498db;
-        border: none;
-        padding: 12px;
-        color: white;
-        border-radius: 8px;
-        width: 100%;
-        margin-top: 10px;
-        font-size: 16px;
-        cursor: pointer;
-    }
-
-    button:active {
-        opacity: 0.8;
-    }
-
-    .row {
-        display: flex;
-        gap: 10px;
-        margin-top: 10px;
-    }
-
-    select {
-        width: 100%;
-        padding: 10px;
-        border-radius: 6px;
-        border: 1px solid #aaa;
-    }
-
-    footer {
-        text-align: center;
-        padding: 20px;
-        color: #777;
-    }
-
+  :root{--bg:#eef2f5;--card:#fff;--primary:#3498db;}
+  html,body{height:100%;margin:0;font-family:Segoe UI,Roboto,Arial;background:var(--bg);color:#222}
+  #map{width:100%;height:64vh;min-height:480px}
+  .card{max-width:1100px;margin:12px auto;background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+  .header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .controls button{margin-left:6px;padding:8px 12px;border-radius:8px;border:none;background:var(--primary);color:#fff;cursor:pointer}
+  .resultado{margin-top:12px;padding:12px;border-radius:10px;border:1px solid #3498db33;background:#fbfdff;min-height:48px}
+  .form-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  select{padding:8px;border-radius:8px;border:1px solid #ddd}
+  .actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .actions button{flex:1;padding:10px;border-radius:8px;border:none;color:#fff;cursor:pointer;min-width:130px}
+  footer{text-align:center;padding:12px;color:#666}
+  #tilePrecacheProgress{position:fixed;left:12px;bottom:12px;z-index:4000;background:#fff;padding:8px 12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.12);display:none}
+  #tileError{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:3000;background:#fff6e6;border:1px solid #ffd7a6;padding:8px 12px;border-radius:8px;display:none}
+  #btnInstall{display:none;margin-left:8px;padding:8px 10px;border-radius:8px;border:none;background:#2d9cdb;color:#fff;cursor:pointer}
 </style>
 </head>
 <body>
 
-<div id="map"></div>
+<div id="tileError" role="status" aria-live="polite"></div>
+<div id="map" aria-label="Mapa Safe Turn"></div>
 
-<div class="container">
-    <h2>Safe Turn</h2>
-
-    <button id="btnRecord">Gravar Movimento</button>
-
-    <div class="row">
-        <button id="btnUndo">Desfazer</button>
-        <button id="btnClear">Limpar</button>
+<div class="card" role="main">
+  <div class="header">
+    <h2 style="margin:0">Safe Turn</h2>
+    <div>
+      <button id="btnUndo" class="controls" title="Remover último ponto">Desfazer ponto</button>
+      <button id="btnClear" class="controls" title="Limpar tudo">Limpar</button>
+      <button id="btnRecord" class="controls" title="Iniciar/parar gravação">Gravar Movimento</button>
+      <button id="btnCenter" class="controls" title="Centralizar no GPS">Centralizar GPS</button>
+      <button id="btnInstall">Instalar</button>
     </div>
+  </div>
 
-    <div class="row">
-        <select id="atrito">
-            <option value="0.7">Asfalto Seco (0.70)</option>
-            <option value="0.5">Asfalto Molhado (0.50)</option>
-            <option value="0.4">Terra Seca (0.40)</option>
-            <option value="0.25">Terra Molhada (0.25)</option>
-        </select>
+  <p id="geomResults" class="resultado">Aguardando pontos ou gravação...</p>
 
-        <select id="veiculo">
-            <option value="1">Padrão</option>
-            <option value="0.9">Pesado</option>
-        </select>
+  <div class="form-row" aria-label="Opções">
+    <div><label>Atrito<br><select id="atrito"><option value="0.7">Asfalto Seco</option><option value="0.5">Asfalto Molhado</option><option value="0.4">Terra Seca</option><option value="0.25">Terra Molhada</option></select></label></div>
+    <div><label>Veículo<br><select id="veiculo"><option value="1">Padrão</option><option value="0.9">Pesado</option></select></label></div>
+    <div><label>Margem<br><select id="margem"><option value="0.78">Alta</option><option value="0.85">Média</option><option value="0.92">Baixa</option></select></label></div>
+  </div>
 
-        <select id="margem">
-            <option value="0.78">Alta (22%)</option>
-            <option value="0.85">Média (15%)</option>
-            <option value="0.92">Baixa (8%)</option>
-        </select>
-    </div>
+  <div class="actions">
+    <button id="btnCalc" class="btn-calc" style="background:#3498db">Calcular Curva</button>
+    <button id="btnPDF" style="background:#27ae60">Gerar PDF</button>
+    <button id="btnWA" class="btn-wa" style="background:#25d366">Compartilhar WhatsApp</button>
+  </div>
 
-    <button id="btnCalc">Calcular Curva</button>
-
-    <button id="btnWA" style="background:#25d366">Compartilhar WhatsApp</button>
-
-    <p id="result">Aguardando pontos...</p>
+  <div style="margin-top:10px;color:#666;font-size:13px">
+    Dica: ative "Alta precisão" no celular para melhorar fix GPS.
+  </div>
 </div>
 
 <footer>Feito com ❤️ por Everton Tezzon Ferreira</footer>
 
+<!-- Progress UI container (hidden until in use) -->
+<div id="tilePrecacheProgress" aria-hidden="true">
+  <strong>Pré-carregando tiles</strong>
+  <div id="tilePrecacheText" style="font-size:13px;margin-top:6px">Aguardando...</div>
+  <div style="height:8px;background:#eee;border-radius:6px;margin-top:8px;overflow:hidden">
+    <div id="tilePrecacheBarFill" style="width:0%;height:100%;background:#3498db"></div>
+  </div>
+</div>
+
+<!-- Scripts -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-polylinedecorator/1.7.0/leaflet.polylineDecorator.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
-let map, userMarker;
-let points = [];
+/* ========= CONFIG ========= */
+const TILE_PROVIDER = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const PRECACHE_RADIUS_KM = 1.0;
+const PRECACHE_ZOOM = 16;
+const PRECACHE_CACHE_NAME = "tiles-cache-v1";
+const CONCURRENCY = 6;
+const RATE_DELAY = 30; // ms between requests
+/* ========================== */
+
+function showTileError(msg, t=4500){
+  const el = document.getElementById('tileError');
+  el.textContent = msg; el.style.display='block';
+  if(t>0) setTimeout(()=> el.style.display='none', t);
+}
+
+/* ----------------- helpers ----------------- */
+function deg2tile(lat_deg, lon_deg, z){
+  const n = Math.pow(2,z);
+  const xt = n * ((lon_deg + 180) / 360);
+  const lat_rad = lat_deg * Math.PI/180;
+  const yt = n * (1 - (Math.log(Math.tan(lat_rad) + 1 / Math.cos(lat_rad)) / Math.PI)) / 2;
+  return {x: xt, y: yt};
+}
+function tile2deg(x,y,z){
+  const n = Math.pow(2,z);
+  const lon = x / n * 360 - 180;
+  const lat_rad = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n)));
+  return {lat: lat_rad * 180/Math.PI, lon};
+}
+function bbox_for_radius(lat, lon, radius_km){
+  const R = 6371.0;
+  const dlat = (radius_km / R) * (180/Math.PI);
+  const dlon = (radius_km / R) * (180/Math.PI) / Math.cos(lat * Math.PI/180);
+  return {latMin: lat - dlat, latMax: lat + dlat, lonMin: lon - dlon, lonMax: lon + dlon};
+}
+function haversineKm(lat1,lon1,lat2,lon2){
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R*c;
+}
+
+/* ----------------- Map init & tiles ----------------- */
+const map = L.map('map', { zoomControl:true }).setView([-21.050964, -50.845963], 15);
+
+// offline grid fallback
+const GridLayer = L.GridLayer.extend({
+  createTile: function(coords){
+    const tile = document.createElement('canvas'); tile.width = tile.height = 256;
+    const ctx = tile.getContext('2d');
+    ctx.fillStyle = '#e9eef2'; ctx.fillRect(0,0,256,256);
+    ctx.strokeStyle = '#d0d7db'; ctx.lineWidth = 1;
+    for(let i=0;i<256;i+=32){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,256); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(256,i); ctx.stroke(); }
+    ctx.fillStyle='#6b6b6b'; ctx.font='11px sans-serif';
+    ctx.fillText('z:'+coords.z+' x:'+coords.x+' y:'+coords.y,6,16);
+    return tile;
+  }
+});
+const offlineGrid = new GridLayer();
+
+let activeTileLayer = null;
+let triedOSM=false, tileFailed=false;
+
+function setTileLayer(url,name){
+  try{ if(activeTileLayer) map.removeLayer(activeTileLayer); }catch(e){}
+  activeTileLayer = L.tileLayer(url, { maxZoom:20, crossOrigin:true });
+  activeTileLayer.on('tileerror', function(err){
+    console.warn('tileerror', name, err);
+    if(name === 'esri' && !triedOSM){
+      triedOSM = true;
+      showTileError('Satélite Esri indisponível — tentando OSM...', 3000);
+      setTileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', 'osm');
+    } else {
+      tileFailed = true;
+      showTileError('Tiles indisponíveis — usando mapa offline (grid).',4000);
+      try{ map.removeLayer(activeTileLayer);}catch(e){} offlineGrid.addTo(map);
+    }
+  });
+  activeTileLayer.addTo(map);
+}
+setTileLayer(TILE_PROVIDER, 'esri');
+setTimeout(()=>{ if(!triedOSM && !tileFailed) { triedOSM = true; setTileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png','osm'); } }, 7000);
+
+/* ----------------- Service Worker registration & PWA install handling ----------------- */
+let deferredPrompt = null;
+const btnInstall = document.getElementById('btnInstall');
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; btnInstall.style.display = 'inline-block'; });
+btnInstall.addEventListener('click', async () => { if(!deferredPrompt) return; deferredPrompt.prompt(); const choice = await deferredPrompt.userChoice; deferredPrompt = null; btnInstall.style.display='none'; });
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').then(reg => { console.log('SW registered', reg.scope); }).catch(e => console.warn('SW fail',e));
+}
+
+/* ----------------- State & markers ----------------- */
+let liveMarker = null;
 let recording = false;
-let watchID = null;
+let watchId = null;
+let track = []; // recorded points {lat,lng,ts}
+let trackLine = null;
+let recordingDecorator = null;
+let manualMarkers = [];
+let points = []; // selected 3 L.LatLng
+let curveLine = null;
+let curveDecorator = null;
+const recordedGroup = L.layerGroup().addTo(map);
 
-function initMap() {
-    map = L.map('map').setView([-23.5, -46.6], 15);
+/* ----------------- Geolocation handlers ----------------- */
+function handleGeoError(err){
+  console.warn('geo err', err);
+  if(err && err.code !== undefined){
+    if(err.code === 1) showTileError('Permissão de localização negada.');
+    else if(err.code === 2) showTileError('Posição indisponível.');
+    else showTileError('Erro de geolocalização.');
+  } else if(err && err.message) showTileError(err.message);
+}
+function onPos(p){
+  const lat = p.coords.latitude, lng = p.coords.longitude, ts = p.timestamp || Date.now();
+  if(!liveMarker) liveMarker = L.circleMarker([lat,lng], { radius:7, fillColor:'#e74c3c', color:'#c0392b', fillOpacity:0.95 }).addTo(map);
+  else liveMarker.setLatLng([lat,lng]);
+  if(!map._userCenteredOnce){ map._userCenteredOnce = true; try{ map.setView([lat,lng],17);}catch(e){} }
+  if(recording){
+    const last = track.length ? track[track.length-1] : null;
+    const candidate = { lat, lng, ts };
+    if(!last) track.push(candidate);
+    else {
+      const d = haversineKm(last.lat, last.lng, candidate.lat, candidate.lng)*1000; // meters
+      const dt = candidate.ts - last.ts;
+      if(d >= 1.5 || dt >= 600) track.push(candidate);
+    }
+    redrawRecordingLine();
+  }
+  // try precache on first reliable fix
+  tryAutoPrecacheOnFirstFix(lat,lng);
+}
+function onGeoErr(p){ handleGeoError(p); }
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
-    }).addTo(map);
+function startWatch(){
+  if(!('geolocation' in navigator)){ showTileError('Geolocalização não suportada.'); return; }
+  try {
+    if(watchId) navigator.geolocation.clearWatch(watchId);
+    watchId = navigator.geolocation.watchPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:0, timeout:20000 });
+    // try a quick getCurrentPosition first to speed initial fix
+    navigator.geolocation.getCurrentPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:0, timeout:8000 });
+  } catch(e){ console.error('watch fail', e); showTileError('Erro ao ativar geolocalização.'); }
+}
+startWatch();
 
-    userMarker = L.circleMarker([-23.5, -46.6], {
-        radius: 10,
-        color: "red",
-        fillColor: "red",
-        fillOpacity: 1
-    }).addTo(map);
-
-    navigator.geolocation.getCurrentPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        userMarker.setLatLng([lat, lon]);
-        map.setView([lat, lon], 18);
-    });
-
-    watchID = navigator.geolocation.watchPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        userMarker.setLatLng([lat, lon]);
-
-        if (recording) {
-            points.push([lat, lon]);
-        }
-    });
+/* ----------------- Recording visuals (red line + arrow) ----------------- */
+function redrawRecordingLine(){
+  try{ if(trackLine) map.removeLayer(trackLine);}catch(e){}
+  try{ if(recordingDecorator) map.removeLayer(recordingDecorator);}catch(e){}
+  if(track.length > 0){
+    trackLine = L.polyline(track.map(p=>[p.lat,p.lng]), { color:'red', weight:4, opacity:0.95 }).addTo(recordedGroup);
+    recordingDecorator = L.polylineDecorator(trackLine, {
+      patterns: [{offset:'100%', repeat:0, symbol: L.Symbol.arrowHead({pixelSize:14, polygon:true, pathOptions:{color:'red', fillColor:'red', fillOpacity:1}})}]
+    }).addTo(recordedGroup);
+  }
 }
 
-document.getElementById("btnRecord").onclick = () => {
-    recording = !recording;
-    document.getElementById("btnRecord").innerText = recording ? "Gravando..." : "Gravar Movimento";
-
-    if (!recording) {
-        alert("Movimento gravado!");
-    }
-};
-
-document.getElementById("btnUndo").onclick = () => {
-    points.pop();
-};
-
-document.getElementById("btnClear").onclick = () => {
-    points = [];
-    navigator.geolocation.getCurrentPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        map.setView([lat, lon], 18);
-    });
-};
-
-document.getElementById("btnCalc").onclick = () => {
-    if (points.length < 3) {
-        alert("Grave 3 pontos!");
-        return;
-    }
-
-    const A = points[0];
-    const B = points[Math.floor(points.length / 2)];
-    const C = points[points.length - 1];
-
-    const R = calcRadius(A, B, C);
-
-    const atrito = parseFloat(document.getElementById("atrito").value);
-    const veiculo = parseFloat(document.getElementById("veiculo").value);
-    const margem = parseFloat(document.getElementById("margem").value);
-
-    const vel = Math.sqrt(R * 9.8 * atrito) * 3.6 * veiculo * margem;
-
-    document.getElementById("result").innerHTML =
-        "Raio estimado: " + R.toFixed(1) + " m<br>Velocidade recomendada: " + vel.toFixed(1) + " km/h";
-
-    window.curveCenter = B;
-    window.curveVel = vel.toFixed(1);
-};
-
-function calcRadius(A, B, C) {
-    function dist(p, q) {
-        return Math.sqrt(
-            Math.pow(p[0] - q[0], 2) +
-            Math.pow(p[1] - q[1], 2)
-        );
-    }
-    const a = dist(B, C);
-    const b = dist(A, C);
-    const c = dist(A, B);
-    const R = (a * b * c) / Math.sqrt((a + b + c) * (-a + b + c) * (a - b + c) * (a + b - c));
-    return R * 100000;
+/* ----------------- Select 3 points from track ----------------- */
+function perpDistanceToLine(a,b,p){
+  const latAvg = ((a.lat + b.lat + p.lat)/3) * Math.PI/180;
+  const R = 6371000;
+  const ax = a.lng * Math.PI/180 * R * Math.cos(latAvg), ay = a.lat * Math.PI/180 * R;
+  const bx = b.lng * Math.PI/180 * R * Math.cos(latAvg), by = b.lat * Math.PI/180 * R;
+  const px = p.lng * Math.PI/180 * R * Math.cos(latAvg), py = p.lat * Math.PI/180 * R;
+  const vx = bx-ax, vy = by-ay, wx = px-ax, wy = py-ay;
+  const vlen2 = vx*vx + vy*vy;
+  if(vlen2===0) return Math.sqrt(wx*wx + wy*wy);
+  const t = (wx*vx + wy*vy) / vlen2;
+  const projx = ax + t*vx, projy = ay + t*vy;
+  const dx = px - projx, dy = py - projy;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+function selectThreeFromTrack(trk){
+  if(!trk || trk.length < 3) return null;
+  const start = {lat: trk[0].lat, lng: trk[0].lng};
+  const end = {lat: trk[trk.length-1].lat, lng: trk[trk.length-1].lng};
+  let maxDist=-1, midIdx=0;
+  for(let i=0;i<trk.length;i++){
+    const d = perpDistanceToLine(start,end,trk[i]);
+    if(d > maxDist){ maxDist = d; midIdx = i; }
+  }
+  return { start, mid: trk[midIdx], end, midIndex: midIdx, maxDist };
 }
 
-document.getElementById("btnWA").onclick = () => {
-    if (!window.curveCenter || !window.curveVel) {
-        alert("Calcule antes!");
-        return;
+/* ----------------- Plot curve & calculate ----------------- */
+function clearCurve(){
+  try{ recordedGroup.clearLayers(); }catch(e){}
+  manualMarkers.forEach(m=>{ try{ map.removeLayer(m);}catch(e){} });
+  manualMarkers = []; points = []; try{ if(curveLine) map.removeLayer(curveLine);}catch(e){} curveLine=null;
+  try{ if(curveDecorator) map.removeLayer(curveDecorator);}catch(e){} curveDecorator=null;
+}
+function plotCurvePoints(p1,p2,p3){
+  clearCurve();
+  const P1 = L.latLng(p1.lat || p1[0], p1.lng || p1[1]);
+  const P2 = L.latLng(p2.lat || p2[0], p2.lng || p2[1]);
+  const P3 = L.latLng(p3.lat || p3[0], p3.lng || p3[1]);
+  L.circleMarker([P1.lat,P1.lng], { radius:6, color:'#27ae60', fillColor:'#2ecc71', fillOpacity:0.95 }).addTo(recordedGroup).bindPopup('Início');
+  L.circleMarker([P2.lat,P2.lng], { radius:6, color:'#f39c12', fillColor:'#f1c40f', fillOpacity:0.95 }).addTo(recordedGroup).bindPopup('Meio');
+  L.circleMarker([P3.lat,P3.lng], { radius:6, color:'#2980b9', fillColor:'#3498db', fillOpacity:0.95 }).addTo(recordedGroup).bindPopup('Fim');
+  curveLine = L.polyline([[P1.lat,P1.lng],[P2.lat,P2.lng],[P3.lat,P3.lng]], { color:'#8e44ad', weight:3, dashArray:'8 6' }).addTo(recordedGroup);
+  curveDecorator = L.polylineDecorator(curveLine, {
+    patterns: [{offset:'100%', repeat:0, symbol: L.Symbol.arrowHead({pixelSize:18, polygon:true, pathOptions:{color:'#8e44ad', fillColor:'#8e44ad', fillOpacity:1}})}]
+  }).addTo(recordedGroup);
+  points = [P1,P2,P3];
+  calcularGeometria();
+}
+function calcularGeometria(){
+  if(!points || points.length < 3){ document.getElementById('geomResults').innerHTML = 'Aguardando 3 pontos.'; return null; }
+  const p1=points[0], p2=points[1], p3=points[2];
+  const c = haversineKm(p1.lat,p1.lng,p3.lat,p3.lng) * 1000;
+  const s = haversineKm(p2.lat,p2.lng, (p1.lat+p3.lat)/2, (p1.lng+p3.lng)/2 ) * 1000;
+  if(s === 0){ document.getElementById('geomResults').innerHTML = '<span style="color:#e74c3c">Sagita zero — escolha outros pontos</span>'; return null; }
+  const R = (c*c)/(8*s) + s/2;
+  const delta = 2 * Math.asin(Math.min(1, c/(2*R))) * (180/Math.PI);
+  const arco = (Math.PI * R * delta) / 180;
+  document.getElementById('geomResults').innerHTML = `<b>Raio (R):</b> ${R.toFixed(2)} m<br><b>Δ:</b> ${delta.toFixed(2)}° — <b>Arco:</b> ${arco.toFixed(2)} m<br><b>Sagita:</b> ${s.toFixed(2)} m — <b>Corda:</b> ${c.toFixed(2)} m`;
+  return {R,delta,arco,s,c};
+}
+
+/* ----------------- Map click manual mode ----------------- */
+map.on('click', e=>{
+  if(points && points.length >= 3){ showTileError('Já existem 3 pontos — limpe ou desfazer para adicionar novos.', 3000); return; }
+  const mk = L.circleMarker(e.latlng, { radius:6, color:'#c0392b', fillColor:'#e74c3c', fillOpacity:0.95 }).addTo(map);
+  manualMarkers.push(mk);
+  points.push(L.latLng(e.latlng.lat, e.latlng.lng));
+  if(points.length === 3) plotCurvePoints(points[0],points[1],points[2]);
+  else document.getElementById('geomResults').innerText = `Pontos manuais: ${points.length} (adicione ${3-points.length})`;
+});
+
+/* ----------------- Buttons ----------------- */
+document.getElementById('btnUndo').addEventListener('click', ()=>{
+  if(manualMarkers.length){ try{ map.removeLayer(manualMarkers.pop()); }catch(e){} points.pop(); document.getElementById('geomResults').innerText = points.length ? `Pontos: ${points.length}` : 'Aguardando pontos...'; }
+  else showTileError('Nada para desfazer (pontos manuais).',1600);
+});
+document.getElementById('btnClear').addEventListener('click', ()=>{
+  try{ recordedGroup.clearLayers(); }catch(e){} manualMarkers.forEach(m=>{ try{ map.removeLayer(m);}catch(e){} }); manualMarkers=[]; points=[]; track=[]; try{ if(trackLine) map.removeLayer(trackLine);}catch(e){} trackLine=null; try{ if(curveLine) map.removeLayer(curveLine);}catch(e){} curveLine=null; document.getElementById('geomResults').innerHTML = 'Aguardando pontos ou gravação...';
+  if(liveMarker && liveMarker.getLatLng){ const p = liveMarker.getLatLng(); map.setView([p.lat,p.lng],17);} else map.setView([-21.050964,-50.845963],15);
+});
+document.getElementById('btnCenter').addEventListener('click', ()=>{ if(liveMarker && liveMarker.getLatLng()){ const p = liveMarker.getLatLng(); map.setView([p.lat,p.lng],17); showTileError('Centralizado no GPS',1200);} else showTileError('GPS ainda não disponível',2000); });
+
+/* Record toggle */
+document.getElementById('btnRecord').addEventListener('click', ()=>{
+  recording = !recording;
+  const btn = document.getElementById('btnRecord');
+  btn.textContent = recording ? 'Parar Gravação' : 'Gravar Movimento';
+  if(recording){
+    track = []; try{ if(trackLine) map.removeLayer(trackLine);}catch(e){} trackLine=null;
+    if(liveMarker && liveMarker.getLatLng()){ const p=liveMarker.getLatLng(); track.push({lat:p.lat,lng:p.lng,ts:Date.now()}); }
+    showTileError('Gravação iniciada (GPS)...',1300);
+  } else {
+    if(track.length < 3){ alert('Track curto: registre um percurso maior ou adicione 3 pontos manualmente.'); redrawRecordingLine(); return; }
+    const sel = selectThreeFromTrack(track);
+    if(sel){ plotCurvePoints(sel.start, sel.mid, sel.end); try{ const bounds = L.latLngBounds(track.map(p=>[p.lat,p.lng]).concat([[sel.start.lat,sel.start.lng],[sel.mid.lat,sel.mid.lng],[sel.end.lat,sel.end.lng]])); map.fitBounds(bounds.pad(0.2)); }catch(e){} showTileError('Gravação finalizada — curva plotada.',2000); }
+    else alert('Não foi possível selecionar 3 pontos automaticamente.');
+  }
+});
+
+/* ----------------- Calculate / PDF / WA ----------------- */
+document.getElementById('btnCalc').addEventListener('click', ()=>{
+  if(!points || points.length < 3){ alert('Defina 3 pontos manualmente ou grave um movimento.'); return; }
+  const geom = calcularGeometria(); if(!geom) return;
+  const atrito = parseFloat(document.getElementById('atrito').value), veiculo = parseFloat(document.getElementById('veiculo').value), margem = parseFloat(document.getElementById('margem').value);
+  const g=9.81; const v = Math.sqrt(atrito * g * geom.R) * veiculo * margem; const vKmh = Math.round(v * 3.6);
+  let resEl = document.getElementById('velRes'); if(!resEl){ resEl=document.createElement('div'); resEl.id='velRes'; resEl.style.marginTop='10px'; document.querySelector('.card').appendChild(resEl); }
+  resEl.innerHTML = `<b>Velocidade Recomendada:</b> ${vKmh} km/h`;
+});
+document.getElementById('btnPDF').addEventListener('click', ()=>{
+  try{ const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.text('Safe Turn - Resultado',10,14); const geomText = document.getElementById('geomResults').innerText || ''; const lines = doc.splitTextToSize(geomText, 180); doc.text(lines, 10, 28); doc.save('resultado-curva.pdf'); } catch(e){ console.error(e); alert('Erro ao gerar PDF'); }
+});
+document.getElementById('btnWA').addEventListener('click', ()=>{
+  if(!points || points.length<3){ alert('Defina 3 pontos antes de compartilhar.'); return; }
+  const geom = calcularGeometria(); if(!geom) return;
+  const atrito = parseFloat(document.getElementById('atrito').value), veiculo = parseFloat(document.getElementById('veiculo').value), margem = parseFloat(document.getElementById('margem').value);
+  const g=9.81; const v = Math.sqrt(atrito * g * geom.R) * veiculo * margem; const vKmh = Math.round(v * 3.6);
+  const p1=points[0], p2=points[1], p3=points[2];
+  const center = (function(a,b,c){ /* circle center robust approx */
+    const latRef=(a.lat+b.lat+c.lat)/3;
+    function latLngToXY(pt){ const R=6371000; return { x: pt.lng * Math.PI/180 * R * Math.cos(latRef*Math.PI/180), y: pt.lat * Math.PI/180 * R }; }
+    const A=latLngToXY(a), B=latLngToXY(b), C=latLngToXY(c);
+    const x1=A.x,y1=A.y,x2=B.x,y2=B.y,x3=C.x,y3=C.y;
+    const D = 2*(x1*(y2-y3)+x2*(y3-y1)+x3*(y1-y2));
+    if(Math.abs(D)<1e-6) return null;
+    const x1sq=x1*x1+y1*y1, x2sq=x2*x2+y2*y2, x3sq=x3*x3+y3*y3;
+    const ux=(x1sq*(y2-y3)+x2sq*(y3-y1)+x3sq*(y1-y2))/D;
+    const uy=(x1sq*(x3-x2)+x2sq*(x1-x3)+x3sq*(x2-x1))/D;
+    const Rm=6371000;
+    return { lat: (uy/Rm)*180/Math.PI, lng: (ux/(Rm*Math.cos(latRef*Math.PI/180)))*180/Math.PI };
+  })(p1,p2,p3) || midpoint(p1,p3);
+  const lat = center.lat.toFixed(6), lng = center.lng.toFixed(6);
+  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  const message = `Link:\n${mapsLink}\nVelocidade: ${vKmh} km/h`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+});
+
+/* ----------------- Precache around current position (client-side) ----------------- */
+function makeTileListFiltered(centerLat, centerLon, radiusKm, z){
+  const bbox = bbox_for_radius(centerLat, centerLon, radiusKm);
+  const t1 = deg2tile(bbox.latMax, bbox.lonMin, z);
+  const t2 = deg2tile(bbox.latMin, bbox.lonMax, z);
+  const xMin = Math.floor(Math.min(t1.x,t2.x)), xMax = Math.ceil(Math.max(t1.x,t2.x));
+  const yMin = Math.floor(Math.min(t1.y,t2.y)), yMax = Math.ceil(Math.max(t1.y,t2.y));
+  const tiles = [];
+  for(let x=xMin;x<=xMax;x++){
+    for(let y=yMin;y<=yMax;y++){
+      const center = tile2deg(x+0.5,y+0.5,z);
+      const d = haversineKm(centerLat, centerLon, center.lat, center.lon);
+      if(d <= radiusKm*1.05) tiles.push({z,x,y});
     }
+  }
+  return {tiles, bbox: {xMin,xMax,yMin,yMax,latMin:bbox.latMin,latMax:bbox.latMax,lonMin:bbox.lonMin,lonMax:bbox.lonMax}};
+}
 
-    const lat = window.curveCenter[0];
-    const lon = window.curveCenter[1];
+// progress UI
+function ensureProgressUI(){ const el = document.getElementById('tilePrecacheProgress'); el.style.display='block'; return el; }
 
-    const link = `https://www.google.com/maps?q=${lat},${lon}`;
+// the precache function
+async function precacheTilesAroundPosition(lat, lon, radiusKm=PRECACHE_RADIUS_KM, z=PRECACHE_ZOOM){
+  const n = makeTileListFiltered(lat, lon, radiusKm, z);
+  const tiles = n.tiles;
+  const total = tiles.length;
+  if(total===0){ alert('Nenhum tile para baixar com esta configuração.'); return; }
+  const estKb = Math.round(total * 30);
+  const estMb = (estKb/1024).toFixed(1);
+  if(!confirm(`Será feito download de ${total} tiles (zoom ${z}) — estimativa ~${estMb} MB. Deseja continuar?`)) return;
+  const el = ensureProgressUI();
+  const textEl = document.getElementById('tilePrecacheText'), fillEl = document.getElementById('tilePrecacheBarFill');
+  textEl.innerText = `0 / ${total}`;
+  const cache = await caches.open(PRECACHE_CACHE_NAME);
+  let completed=0, failed=0;
+  const queue = tiles.slice();
+  async function worker(){
+    while(true){
+      const item = queue.shift();
+      if(!item) break;
+      const url = TILE_PROVIDER.replace('{z}', item.z).replace('{y}', item.y).replace('{x}', item.x);
+      try{
+        const resp = await fetch(url, {mode:'cors', cache:'no-store'});
+        if(resp && resp.status === 200){
+          await cache.put(url, resp.clone());
+          completed++;
+        } else { console.warn('tile fetch fail', url, resp && resp.status); failed++; }
+      } catch(e){ console.warn('tile fetch err', url, e); failed++; }
+      const done = completed + failed;
+      textEl.innerText = `${done} / ${total} (${completed} OK, ${failed} falhas)`;
+      fillEl.style.width = Math.round((done/total)*100) + '%';
+      await new Promise(r=>setTimeout(r, RATE_DELAY));
+    }
+  }
+  const workers = [];
+  for(let i=0;i<CONCURRENCY;i++) workers.push(worker());
+  await Promise.all(workers);
+  textEl.innerText = `Concluído: ${completed} OK, ${failed} falhas (total ${total}).`;
+  setTimeout(()=>{ document.getElementById('tilePrecacheProgress').style.display='none'; }, 3500);
+  const bboxMeta = { lat, lon, radiusKm, zoom: z, tilesCount: total, bbox: n.bbox };
+  await cache.put('/tiles_precache_meta.json', new Response(JSON.stringify(bboxMeta)));
+  return {completed, failed, total, bboxMeta};
+}
 
-    const msg =
-`Link:
-${link}
+let _precachedOnce=false;
+function tryAutoPrecacheOnFirstFix(lat, lon){
+  if(_precachedOnce) return;
+  _precachedOnce = true;
+  setTimeout(()=>{ precacheTilesAroundPosition(lat, lon, PRECACHE_RADIUS_KM, PRECACHE_ZOOM).then(r=>console.log('precache done',r)).catch(e=>console.warn('precache err',e)); }, 700);
+}
 
-Velocidade:
-${window.curveVel} km/h`;
+/* Expose for debug */
+window.SafeTurn = { precacheTilesAroundPosition };
 
-    const url = "https://wa.me/?text=" + encodeURIComponent(msg);
-    window.open(url, "_blank");
-};
-
-initMap();
+/* End of script */
 </script>
-
 </body>
 </html>
