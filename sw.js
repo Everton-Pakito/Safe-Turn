@@ -1,37 +1,43 @@
-const CACHE_NAME = 'safe-turn-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  'https://unpkg.com/leaflet/dist/leaflet.css',
-  'https://unpkg.com/leaflet/dist/leaflet.js'
-];
-
-self.addEventListener('install', event => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).catch(err => console.warn('Cache addAll failed', err))
-  );
+self.addEventListener("install", e => {
+    e.waitUntil(
+        caches.open("safe-turn-v1").then(cache => {
+            return cache.addAll([
+                "./",
+                "./index.html",
+                "./manifest.json",
+                "./icons/icon-192.png",
+                "./icons/icon-512.png",
+                "./offline-tile.png"
+            ]);
+        })
+    );
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.map(k => {
-      if (k !== CACHE_NAME) return caches.delete(k);
-    }))).then(() => self.clients.claim())
-  );
-});
+self.addEventListener("fetch", event => {
+    const request = event.request;
 
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  event.respondWith(
-    caches.match(event.request).then(resp => resp || fetch(event.request).then(fetchResp => {
-      return caches.open(CACHE_NAME).then(cache => {
-        if (event.request.method === 'GET' && url.origin === location.origin) cache.put(event.request, fetchResp.clone());
-        return fetchResp;
-      });
-    }).catch(() => caches.match('/index.html')))
-  );
+    if (/tile|tile\.openstreetmap/i.test(request.url)) {
+        event.respondWith(
+            caches.open("tiles").then(cache =>
+                fetch(request)
+                    .then(response => {
+                        cache.put(request, response.clone());
+                        return response;
+                    })
+                    .catch(() => cache.match(request).then(res => res || caches.match("./offline-tile.png")))
+            )
+        );
+        return;
+    }
+
+    event.respondWith(
+        caches.match(request).then(cached =>
+            cached || fetch(request).then(resp => {
+                return caches.open("dynamic").then(cache => {
+                    cache.put(request, resp.clone());
+                    return resp;
+                });
+            })
+        )
+    );
 });
