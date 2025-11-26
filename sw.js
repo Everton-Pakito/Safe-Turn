@@ -1,8 +1,8 @@
-// sw.js — service worker prioritizando tiles cache-first
+// sw.js — cache strategy: tiles cache-first, static network-first fallback
 const CACHE_STATIC = 'safe-turn-static-v1';
 const CACHE_TILES = 'tiles-cache-v1';
 
-// Precaching minimal static assets on install
+// Install: precache minimal app shell
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
@@ -18,7 +18,6 @@ self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
-// helper to detect Esri tile urls (tile/{z}/{y}/{x})
 function isEsriTile(url){
   return /arcgisonline\.com.*\/tile\/\d+\/\d+\/\d+/i.test(url);
 }
@@ -26,24 +25,24 @@ function isEsriTile(url){
 self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
-
   const url = new URL(req.url);
 
-  // If request is to Esri tile service -> try cache first for that exact provider URL
+  // If request is Esri tile pattern, try cache-first (from client precache)
   if (isEsriTile(req.url)){
     event.respondWith(
       caches.open(CACHE_TILES).then(async cache => {
         const cached = await cache.match(req.url);
         if (cached) return cached;
         try {
-          const netResp = await fetch(req);
-          if (netResp && netResp.status === 200){
-            try { cache.put(req.url, netResp.clone()); } catch(e){ console.warn('cache put fail', e); }
-            return netResp;
+          const resp = await fetch(req);
+          if (resp && resp.status === 200){
+            try { cache.put(req.url, resp.clone()); } catch(e) { console.warn('cache put fail', e); }
+            return resp;
           }
         } catch (e) {
-          console.warn('tile network failed', e);
+          console.warn('tile fetch network failed', e);
         }
+        // fallback offline tile
         const fallback = await caches.match('/offline-tile.png');
         if (fallback) return fallback;
         return new Response('', { status: 204, statusText: 'No tile' });
@@ -52,19 +51,16 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // If request is for local /tiles/... -> let network serve static file or fallback to cache (useful if you pre-uploaded tiles)
+  // If local static tiles path is requested (/tiles/...), let network handle (if you uploaded tiles) else fallback to cache
   if (url.pathname.startsWith('/tiles/')){
     event.respondWith(
-      fetch(req).catch(()=> caches.match(req).then(c=> c || new Response('', { status:404 })))
+      fetch(req).catch(()=> caches.match(req).then(c => c || new Response('', { status: 404 })))
     );
     return;
   }
 
-  // default: network-first fallback to cache static
+  // Default: network-first for app shell, fallback to cache
   event.respondWith(
-    fetch(req).then(response => {
-      // optionally cache dynamically: skip for large resources
-      return response;
-    }).catch(()=> caches.match(req).then(cached => cached || caches.match('/index.html')))
+    fetch(req).then(response => response).catch(() => caches.match(req).then(cached => cached || caches.match('/index.html')))
   );
 });
