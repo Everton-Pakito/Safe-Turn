@@ -1,226 +1,290 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Safe Turn — Final (VR & VS + PNG A4)</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Safe Turn</title>
 <link rel="manifest" href="./manifest.json"/>
 <meta name="theme-color" content="#141414"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-  :root{--bg:#eef2f5;--card:#fff;--primary:#3498db;}
-  html,body{height:100%;margin:0;font-family:Segoe UI,Roboto,Arial;background:var(--bg);color:#222}
-  #map{width:100%;height:64vh;min-height:480px}
-  .card{max-width:1100px;margin:12px auto;background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
-  .header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-  .controls button{margin-left:6px;padding:8px 12px;border-radius:8px;border:none;background:var(--primary);color:#fff;cursor:pointer}
-  .resultado{margin-top:12px;padding:12px;border-radius:10px;border:1px solid #3498db33;background:#fbfdff;min-height:80px}
-  .form-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-  select{padding:8px;border-radius:8px;border:1px solid #ddd}
-  .actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
-  .actions button{flex:1;padding:10px;border-radius:8px;border:none;color:#fff;cursor:pointer;min-width:130px}
-  footer{text-align:center;padding:12px;color:#666}
-  #tilePrecacheProgress{position:fixed;left:12px;bottom:12px;z-index:4000;background:#fff;padding:8px 12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.12);display:none}
-  #tileError{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:3000;background:#fff6e6;border:1px solid #ffd7a6;padding:8px 12px;border-radius:8px;display:none;max-width:92%}
+  :root{
+    --accent:#3498db;
+    --muted:#666;
+  }
+  html,body{height:100%;margin:0;font-family:Segoe UI, Roboto, Arial;background:#000;color:#fff}
+  /* FULLSCREEN MAP */
+  #map{position:fixed;inset:0;width:100%;height:100vh;z-index:0}
+  /* App title top-left */
+  #appTitle{
+    position:fixed; top:10px; left:12px; z-index:4300;
+    background:rgba(0,0,0,0.55); padding:6px 10px;
+    border-radius:6px; font-size:16px; color:#fff; font-weight:700;
+    backdrop-filter: blur(4px);
+    pointer-events:none;
+  }
+  /* Floating controls (top-left, next to title) */
+  .floating-controls{
+    position:fixed; left:12px; top:48px; z-index:4500;
+    background:rgba(255,255,255,0.92); border-radius:10px; padding:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,.18); display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+  }
+  .floating-controls button, .floating-controls select{
+    font-size:13px; padding:8px; border-radius:7px; border:1px solid #ddd; cursor:pointer; background:#fff; color:#111;
+  }
+  .floating-controls button.primary{background:var(--accent); color:#fff; border:none}
+  .floating-help{position:fixed; left:12px; bottom:52px; z-index:4500; background:rgba(255,255,255,0.9); padding:6px 8px; border-radius:8px; font-size:12px; color:#333; display:none}
+  /* Popup hint (top-center) */
+  .gps-hint{
+    position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:4600;
+    background:rgba(255,255,255,0.96); padding:10px 14px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.25);
+    font-size:14px; color:#111; display:flex; gap:10px; align-items:center;
+  }
+  .gps-hint button{background:var(--accent); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer}
+  /* Overlay results (bottom-left smaller and responsive) */
+  .map-overlay{
+    position:fixed;
+    left:12px;
+    bottom:12px;
+    z-index:4200;
+    background:rgba(255,255,255,0.92);
+    border-radius:8px;
+    padding:10px 12px;
+    width:auto;
+    min-width:160px;
+    max-width:260px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.25);
+    font-size:13px;
+    color:#111;
+    line-height:1.35;
+  }
+  .map-overlay .line{ margin-bottom:6px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .map-overlay .label{ font-size:12px; font-weight:600; color:#333; }
+  .map-overlay .value{ font-size:13px; font-weight:700; color:#000; text-align:right; white-space:nowrap; }
+  /* Footer (centered, discreet) */
+  #footerApp{
+    position:fixed; bottom:6px; left:0; right:0;
+    text-align:center; font-size:11px; color:rgba(255,255,255,0.85); z-index:4200;
+    text-shadow:0 0 6px rgba(0,0,0,0.6); pointer-events:none;
+  }
+  @media (max-width:700px){
+    #appTitle{ top:8px; left:8px; font-size:14px }
+    .floating-controls{ left:8px; top:42px; padding:6px }
+    .floating-controls button, .floating-controls select{ font-size:12px; padding:6px }
+    .map-overlay{ min-width:140px; max-width:220px; padding:8px; font-size:12px }
+    .gps-hint{ font-size:13px; padding:8px }
+  }
+  @media print { .floating-controls, .floating-help, .gps-hint { display:none } }
 </style>
 </head>
 <body>
 
-<div id="tileError" role="status" aria-live="polite"></div>
-<div id="map" aria-label="Mapa Safe Turn"></div>
+<div id="map" role="application" aria-label="Mapa Safe Turn"></div>
 
-<div class="card" role="main">
-  <div class="header">
-    <h2 style="margin:0">Safe Turn</h2>
-    <div>
-      <button id="btnUndo" class="controls" title="Remover último ponto">Desfazer ponto</button>
-      <button id="btnClear" class="controls" title="Limpar tudo">Limpar</button>
-      <button id="btnRecord" class="controls" title="Iniciar/parar gravação">Gravar Movimento</button>
-      <button id="btnCenter" class="controls" title="Centralizar no GPS">Centralizar GPS</button>
-    </div>
-  </div>
+<!-- App title top-left -->
+<div id="appTitle">Safe Turn</div>
 
-  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
-    <div style="flex:1;min-width:260px">
-      <p id="geomResults" class="resultado">Aguardando pontos ou gravação...</p>
-      <div style="margin-top:10px;color:#666;font-size:13px">
-        Dica: ative "Alta precisão" no celular para melhorar fix GPS.
-      </div>
-    </div>
+<!-- floating controls -->
+<div class="floating-controls" id="controls" role="region" aria-label="Controles">
+  <button id="btnRecord" class="primary">Gravar Movimento</button>
+  <button id="btnUndo">Desfazer</button>
+  <button id="btnClear">Limpar</button>
+  <button id="btnCenter">Centralizar GPS</button>
 
-    <div style="width:320px">
-      <div class="form-row" aria-label="Opções">
-        <div style="width:100%">
-          <label>Atrito<br>
-            <select id="atrito" style="width:100%">
-              <option value="0.7">Asfalto Seco (0.7)</option>
-              <option value="0.5">Asfalto Molhado (0.5)</option>
-              <option value="0.4">Terra Seca (0.4)</option>
-              <option value="0.25">Terra Molhada (0.25)</option>
-            </select>
-          </label>
-        </div>
-        <div style="width:100%">
-          <label>Veículo<br>
-            <!-- vehicleFactor: default 1.0, heavy 0.75 (more conservative) -->
-            <select id="veiculo" style="width:100%">
-              <option value="1">Padrão (1.00)</option>
-              <option value="0.75">Pesado (0.75)</option>
-            </select>
-          </label>
-        </div>
-        <div style="width:100%">
-          <label>Margem<br>
-            <select id="margem" style="width:100%">
-              <option value="0.78">Alta segurança (0.78)</option>
-              <option value="0.85">Média (0.85)</option>
-              <option value="0.92">Baixa (0.92)</option>
-            </select>
-          </label>
-        </div>
-      </div>
+  <label style="display:flex;align-items:center;gap:6px">
+    Atrito
+    <select id="atrito" title="coeficiente de atrito">
+      <option value="0.7">0.7</option>
+      <option value="0.5">0.5</option>
+      <option value="0.4">0.4</option>
+      <option value="0.25">0.25</option>
+    </select>
+  </label>
 
-      <div class="actions" style="margin-top:12px">
-        <button id="btnCalc" class="btn-calc" style="background:#3498db">Calcular Curva</button>
-        <button id="btnPNG" style="background:#27ae60">Gerar PNG (A4)</button>
-        <button id="btnWA" class="btn-wa" style="background:#25d366">Compartilhar WhatsApp</button>
-      </div>
-    </div>
+  <label style="display:flex;align-items:center;gap:6px">
+    Veículo
+    <select id="veiculo" title="fator veículo">
+      <option value="1">Padrão</option>
+      <option value="0.75">Pesado</option>
+    </select>
+  </label>
+
+  <button id="btnCalc">Calcular</button>
+  <button id="btnPNG">Gerar PNG</button>
+  <button id="btnWA">WhatsApp</button>
+</div>
+
+<!-- small help (hidden) -->
+<div class="floating-help" id="floatingHelp" style="display:none">Use 3 pontos ou grave movimento</div>
+
+<!-- gps hint popup (shown until closed) -->
+<div id="gpsHint" class="gps-hint" style="display:none" role="dialog" aria-live="polite">
+  <div style="max-width:640px">Dica: ative <strong>Alta precisão</strong> no GPS do seu dispositivo para melhor fix. Clique 3 pontos manualmente ou grave um movimento para mapear a curva.</div>
+  <div style="margin-left:6px">
+    <button id="gpsHintClose">OK</button>
   </div>
 </div>
 
-<footer>Feito com ❤️ por Everton Tezzon Ferreira</footer>
-
-<!-- progress UI (hidden) -->
-<div id="tilePrecacheProgress" aria-hidden="true">
-  <strong>Pré-carregando tiles</strong>
-  <div id="tilePrecacheText" style="font-size:13px;margin-top:6px">Aguardando...</div>
-  <div style="height:8px;background:#eee;border-radius:6px;margin-top:8px;overflow:hidden">
-    <div id="tilePrecacheBarFill" style="width:0%;height:100%;background:#3498db"></div>
-  </div>
+<!-- overlay inside map (bottom-left) -->
+<div class="map-overlay" id="mapOverlay" aria-live="polite">
+  <div class="line"><div class="label">Centro:</div><div id="ovCenter" class="value">-</div></div>
+  <div class="line"><div class="label">VR:</div><div id="ovVR" class="value">-</div></div>
+  <div class="line"><div class="label">VS:</div><div id="ovVS" class="value">-</div></div>
+  <div class="line"><div class="label">Raio:</div><div id="ovR" class="value">-</div></div>
+  <div class="line"><div class="label">Δ:</div><div id="ovDelta" class="value">-</div></div>
+  <div class="line"><div id="ovMessage" style="font-size:11px;color:#555">Aguardando 3 pontos ou gravação.</div></div>
 </div>
+
+<!-- discrete footer centered -->
+<div id="footerApp">Feito com ❤️ por Everton Tezzon Ferreira</div>
 
 <!-- libs -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-polylinedecorator/1.7.0/leaflet.polylineDecorator.min.js"></script>
-<!-- html2canvas to capture map for PNG export -->
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 
 <script>
-/* ================= CONFIG & HELPERS ================= */
+/* ================== Helpers & Config ================== */
 const TILE_PROVIDER = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const PRECACHE_RADIUS_KM = 1.0, PRECACHE_ZOOM = 16;
-const PRECACHE_CACHE_NAME = "tiles-cache-v1";
-const CONCURRENCY = 6, RATE_DELAY = 30;
+const G = 9.81;
 
-function showTileError(msg, t=4500){
-  const el = document.getElementById('tileError');
-  el.textContent = msg;
-  el.style.display = 'block';
-  if(t>0) setTimeout(()=> el.style.display='none', t);
-}
 function haversineKm(aLat,aLng,bLat,bLng){
   const R=6371; const dLat=(bLat-aLat)*Math.PI/180; const dLon=(bLng-aLng)*Math.PI/180;
   const A = Math.sin(dLat/2)**2 + Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*Math.sin(dLon/2)**2;
   const C = 2 * Math.atan2(Math.sqrt(A), Math.sqrt(1-A));
   return R*C;
 }
-function floorToNearest5(n){
-  // Always round DOWN to nearest multiple of 5
-  return Math.max(0, Math.floor(n / 5) * 5);
-}
-/* =================================================== */
+function floorToNearest5(n){ return Math.max(0, Math.floor(n / 5) * 5); }
 
-/* ---------------- Map init & tile layer ---------------- */
+/* new setOverlay signature: setOverlay(center, vr, vs, R, delta, message) */
+function setOverlay(center, vr, vs, R, delta, message){
+  document.getElementById('ovCenter').textContent = center ? `${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}` : '-';
+  document.getElementById('ovVR').textContent = (vr !== null && vr !== undefined) ? (vr + ' km/h') : '-';
+  document.getElementById('ovVS').textContent = (vs !== null && vs !== undefined) ? (vs + ' km/h') : '-';
+  document.getElementById('ovR').textContent = R ? `${R.toFixed(2)}` : '-';
+  document.getElementById('ovDelta').textContent = delta ? `${delta.toFixed(2)}°` : '-';
+  document.getElementById('ovMessage').textContent = message || 'Aguardando 3 pontos ou gravação.';
+}
+
+/* ================== Map init ================== */
 const map = L.map('map', { zoomControl:true }).setView([-21.050964, -50.845963], 15);
+const tileLayer = L.tileLayer(TILE_PROVIDER, { maxZoom:20, crossOrigin:true, errorTileUrl:'/offline-tile.png', attribution:'Esri' }).addTo(map);
+tileLayer.on('tileerror', ()=> console.warn('tile error'));
 
-const offlineGrid = L.gridLayer && new (L.GridLayer.extend({
-  createTile: function(coords){
-    const tile = document.createElement('canvas'); tile.width = tile.height = 256;
-    const ctx = tile.getContext('2d');
-    ctx.fillStyle = '#e9eef2'; ctx.fillRect(0,0,256,256);
-    ctx.strokeStyle = '#d0d7db'; ctx.lineWidth = 1;
-    for(let i=0;i<256;i+=32){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,256); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(256,i); ctx.stroke(); }
-    ctx.fillStyle='#6b6b6b'; ctx.font='11px sans-serif';
-    ctx.fillText('z:'+coords.z+' x:'+coords.x+' y:'+coords.y,6,16);
-    return tile;
-  }
-}))();
-
-let tileLayer = null;
-function setSatelliteLayer(){
-  try{ if(tileLayer) map.removeLayer(tileLayer); } catch(e){}
-  tileLayer = L.tileLayer(TILE_PROVIDER, { maxZoom:20, crossOrigin:true, errorTileUrl:'/offline-tile.png', attribution:'Esri' });
-  tileLayer.on('tileerror', e => {
-    console.warn('tile error', e);
-    // fallback: keep tileLayer but show small message
-    showTileError('Satélite indisponível (CORS ou rede). Se persistir, use offline tiles ou OSM.', 4500);
-    if(!map.hasLayer(offlineGrid)) offlineGrid.addTo(map);
-  });
-  tileLayer.addTo(map);
-}
-setSatelliteLayer();
-
-/* ---------- state ---------- */
 const recordedGroup = L.layerGroup().addTo(map);
+
+/* ================== State ================== */
 let liveMarker = null;
 let recording = false, watchId = null;
-let track = []; // recorded gps points
-let trackLine = null, recordingDecorator = null;
-let manualMarkers = []; // manual markers
-let points = []; // canonical points (L.LatLng) for calculations
+let track = [], trackLine = null, recordingDecorator = null;
+let manualMarkers = [], points = [];
 let curveLine = null, curveDecorator = null;
 
-/* ---------- geolocation ---------- */
-function onGeoErr(err){ console.warn('geo err', err); if(err && err.code!==undefined){ if(err.code===1) showTileError('Permissão de localização negada.'); else if(err.code===2) showTileError('Posição indisponível.'); else showTileError('Erro de geolocalização.'); } }
+/* ================== GPS Hint logic ================== */
+const gpsHintEl = document.getElementById('gpsHint');
+const gpsHintCloseBtn = document.getElementById('gpsHintClose');
+// Show popup only if not dismissed before
+if(!localStorage.getItem('safeTurn_gpsHintDismissed')){
+  gpsHintEl.style.display = 'flex';
+}
+gpsHintCloseBtn.addEventListener('click', ()=>{
+  gpsHintEl.style.display = 'none';
+  localStorage.setItem('safeTurn_gpsHintDismissed', '1');
+});
+
+/* ================== Geolocation ================== */
+function onGeoErr(err){
+  console.warn('geo err', err);
+  const m = err && err.code===1 ? 'Permissão negada' : (err && err.code===2 ? 'Posição indisponível' : 'Erro de geolocalização');
+  setOverlay(null, null, null, null, null, m);
+}
 function onPos(p){
-  const lat = p.coords.latitude, lng = p.coords.longitude, ts = p.timestamp || Date.now();
-  if(!liveMarker) liveMarker = L.circleMarker([lat,lng], { radius:7, fillColor:'#e74c3c', color:'#c0392b', fillOpacity:0.95 }).addTo(map);
+  const lat = p.coords.latitude, lng = p.coords.longitude;
+  if(!liveMarker) liveMarker = L.circleMarker([lat,lng], { radius:7, fillColor:'#e74c3c', color:'#c0392b', fillOpacity:0.95 }).addTo(recordedGroup);
   else liveMarker.setLatLng([lat,lng]);
   if(!map._userCenteredOnce){ map._userCenteredOnce=true; map.setView([lat,lng],17); }
   if(recording){
     const last = track.length ? track[track.length-1] : null;
-    const cand = {lat,lng,ts};
+    const cand = {lat,lng,ts: Date.now()};
     if(!last) track.push(cand);
     else {
-      const d = haversineKm(last.lat,last.lng,cand.lat,cand.lng)*1000;
+      const d = haversineKm(last.lat,last.lng,cand.lat,cand.lng) * 1000;
       const dt = cand.ts - last.ts;
-      if(d>=1.5 || dt>=600) track.push(cand);
+      if(d >= 1.5 || dt >= 600) track.push(cand);
     }
     redrawRecordingLine();
   }
-  tryAutoPrecacheOnFirstFix(lat,lng);
+  setOverlay(null, null, null, null, null, 'GPS OK');
 }
 function startWatch(){
-  if(!('geolocation' in navigator)){ showTileError('Geolocalização não suportada.'); return; }
+  if(!('geolocation' in navigator)){ setOverlay(null, null, null, null, null, 'Geolocalização não suportada'); return; }
   try{
     if(watchId) navigator.geolocation.clearWatch(watchId);
-    watchId = navigator.geolocation.watchPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:0, timeout:20000 });
-    navigator.geolocation.getCurrentPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:0, timeout:8000 });
-  } catch(e){ console.error('watch fail',e); showTileError('Erro ao ativar geolocalização.'); }
+    watchId = navigator.geolocation.watchPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:2000, timeout:20000 });
+    navigator.geolocation.getCurrentPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:0, timeout:10000 });
+  } catch(e){
+    console.error('watch fail', e);
+    setOverlay(null, null, null, null, null, 'Erro ao ativar GPS');
+  }
 }
 startWatch();
 
-/* ---------- drawing helpers ---------- */
+/* center button */
+document.getElementById('btnCenter').addEventListener('click', ()=>{
+  if(liveMarker && liveMarker.getLatLng) { map.setView(liveMarker.getLatLng(), 17); }
+  else setOverlay(null, null, null, null, null, 'GPS ainda não disponível');
+});
+
+/* ================== Drawing & Recording ================== */
 function redrawRecordingLine(){
-  try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){}
-  try{ if(recordingDecorator) recordedGroup.removeLayer(recordingDecorator);}catch(e){}
-  if(track.length>0){
+  try{ if(trackLine) recordedGroup.removeLayer(trackLine); }catch(e){}
+  try{ if(recordingDecorator) recordedGroup.removeLayer(recordingDecorator); }catch(e){}
+  if(track.length > 0){
     trackLine = L.polyline(track.map(p=>[p.lat,p.lng]), { color:'red', weight:4, opacity:0.95 }).addTo(recordedGroup);
     recordingDecorator = L.polylineDecorator(trackLine, {
       patterns: [{offset:'100%', repeat:0, symbol: L.Symbol.arrowHead({pixelSize:14, polygon:true, pathOptions:{color:'red', fillColor:'red', fillOpacity:1}})}]
     }).addTo(recordedGroup);
   }
 }
-function clearCurveOnly(){
-  try{ if(curveLine) recordedGroup.removeLayer(curveLine);}catch(e){}
-  try{ if(curveDecorator) recordedGroup.removeLayer(curveDecorator);}catch(e){}
-  manualMarkers.forEach(m=>{ try{ map.removeLayer(m);}catch(e){} });
-  manualMarkers = [];
-  curveLine = null; curveDecorator = null; points = [];
-}
 
-/* ---------- geometry selection from track ---------- */
+/* manual points via click */
+map.on('click', e=>{
+  if(points && points.length >= 3) clearCurveOnly();
+  const mk = L.circleMarker(e.latlng, { radius:6, color:'#c0392b', fillColor:'#e74c3c', fillOpacity:0.95 }).addTo(map);
+  manualMarkers.push(mk);
+  points.push(L.latLng(e.latlng.lat, e.latlng.lng));
+  if(points.length === 3) plotCurvePoints(points[0], points[1], points[2]);
+  else setOverlay(null, null, null, null, null, `Pontos: ${points.length} (adicione ${3-points.length})`);
+});
+
+/* undo / clear */
+document.getElementById('btnUndo').addEventListener('click', ()=>{
+  if(manualMarkers.length){ try{ map.removeLayer(manualMarkers.pop()); }catch(e){} points.pop(); setOverlay(null, null, null, null, null, points.length ? `Pontos: ${points.length}` : 'Aguardando pontos'); }
+  else setOverlay(null, null, null, null, null, 'Nada para desfazer');
+});
+document.getElementById('btnClear').addEventListener('click', ()=>{
+  try{ recordedGroup.clearLayers(); }catch(e){}
+  manualMarkers = []; points = []; track = []; try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){} trackLine=null;
+  setOverlay(null, null, null, null, null, 'Aguardando pontos ou gravação');
+});
+
+/* record toggle */
+document.getElementById('btnRecord').addEventListener('click', ()=>{
+  recording = !recording;
+  document.getElementById('btnRecord').textContent = recording ? 'Parar Gravação' : 'Gravar Movimento';
+  if(recording){
+    track = []; try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){} trackLine=null;
+    if(liveMarker && liveMarker.getLatLng) track.push({lat: liveMarker.getLatLng().lat, lng: liveMarker.getLatLng().lng, ts: Date.now()});
+    setOverlay(null, null, null, null, null, 'Gravando (aguardando movimento)');
+  } else {
+    if(track.length < 3){ alert('Track curto: registre um percurso maior ou adicione 3 pontos manualmente.'); redrawRecordingLine(); return; }
+    const sel = selectThreeFromTrack(track);
+    if(sel){ plotCurvePoints(sel.start, sel.mid, sel.end); try{ const bounds = L.latLngBounds(track.map(p=>[p.lat,p.lng])); map.fitBounds(bounds.pad(0.2)); }catch(e){} }
+    else alert('Não foi possível selecionar 3 pontos automaticamente.');
+  }
+});
+
+/* ================== Geometry & Plot ================== */
 function perpDistanceToLine(a,b,p){
   const latAvg = ((a.lat + b.lat + p.lat)/3) * Math.PI/180;
   const R = 6371000;
@@ -247,305 +311,249 @@ function selectThreeFromTrack(trk){
   return { start, mid: trk[midIdx], end, midIndex: midIdx, maxDist };
 }
 
-/* ---------- plot curve & arrow ---------- */
-function plotCurvePoints(p1,p2,p3){
-  clearCurveOnly();
-  const P1 = L.latLng(p1.lat || p1[0], p1.lng || p1[1]);
-  const P2 = L.latLng(p2.lat || p2[0], p2.lng || p2[1]);
-  const P3 = L.latLng(p3.lat || p3[0], p3.lng || p3[1]);
-
-  L.circleMarker([P1.lat,P1.lng], { radius:6, color:'#27ae60', fillColor:'#2ecc71', fillOpacity:0.95 }).addTo(recordedGroup).bindPopup('Início');
-  L.circleMarker([P2.lat,P2.lng], { radius:6, color:'#f39c12', fillColor:'#f1c40f', fillOpacity:0.95 }).addTo(recordedGroup).bindPopup('Meio');
-  L.circleMarker([P3.lat,P3.lng], { radius:6, color:'#2980b9', fillColor:'#3498db', fillOpacity:0.95 }).addTo(recordedGroup).bindPopup('Fim');
-
-  curveLine = L.polyline([[P1.lat,P1.lng],[P2.lat,P2.lng],[P3.lat,P3.lng]], { color:'#8e44ad', weight:3, dashArray:'8 6' }).addTo(recordedGroup);
-  try{
-    curveDecorator = L.polylineDecorator(curveLine, {
-      patterns: [{offset:'100%', repeat:0, symbol: L.Symbol.arrowHead({pixelSize:18, polygon:true, pathOptions:{color:'#8e44ad', fillColor:'#8e44ad', fillOpacity:1}})}]
-    }).addTo(recordedGroup);
-  } catch(e){ console.warn('decorator fail', e); }
-
-  points = [P1, P2, P3];
-  calcularGeometria(); // update UI
+function clearCurveOnly(){
+  try{ if(curveLine) recordedGroup.removeLayer(curveLine);}catch(e){}
+  try{ if(curveDecorator) recordedGroup.removeLayer(curveDecorator);}catch(e){}
+  manualMarkers.forEach(m=>{ try{ map.removeLayer(m);}catch(e){} });
+  manualMarkers = []; curveLine = null; curveDecorator = null; points = [];
+  setOverlay(null, null, null, null, null, 'Aguardando pontos ou gravação');
 }
 
-/* ---------- map clicks (manual points) ---------- */
-map.on('click', e=>{
-  if(points && points.length >= 3){
-    clearCurveOnly();
+function plotCurvePoints(p1,p2,p3){
+  clearCurveOnly();
+  const P1=L.latLng(p1.lat||p1[0], p1.lng||p1[1]);
+  const P2=L.latLng(p2.lat||p2[0], p2.lng||p2[1]);
+  const P3=L.latLng(p3.lat||p3[0], p3.lng||p3[1]);
+
+  L.circleMarker([P1.lat,P1.lng], { radius:6, color:'#27ae60', fillColor:'#2ecc71', fillOpacity:0.95 }).addTo(recordedGroup);
+  L.circleMarker([P2.lat,P2.lng], { radius:6, color:'#f39c12', fillColor:'#f1c40f', fillOpacity:0.95 }).addTo(recordedGroup);
+  L.circleMarker([P3.lat,P3.lng], { radius:6, color:'#2980b9', fillColor:'#3498db', fillOpacity:0.95 }).addTo(recordedGroup);
+
+  curveLine = L.polyline([[P1.lat,P1.lng],[P2.lat,P2.lng],[P3.lat,P3.lng]], { color:'#8e44ad', weight:3, dashArray:'8 6' }).addTo(recordedGroup);
+  try{ curveDecorator = L.polylineDecorator(curveLine, {
+    patterns: [{offset:'100%', repeat:0, symbol: L.Symbol.arrowHead({pixelSize:18, polygon:true, pathOptions:{color:'#8e44ad', fillColor:'#8e44ad', fillOpacity:1}})}]
+  }).addTo(recordedGroup);}catch(e){ console.warn('decorator fail', e); }
+
+  points = [P1,P2,P3];
+  const geom = calcularGeometria();
+  if(geom) {
+    setOverlay(geom.center, geom.vrecom_kmh, geom.vs_kmh, geom.R, geom.deltaDeg, 'Curva calculada');
   }
-  const mk = L.circleMarker(e.latlng, { radius:6, color:'#c0392b', fillColor:'#e74c3c', fillOpacity:0.95 }).addTo(map);
-  manualMarkers.push(mk);
-  points.push(L.latLng(e.latlng.lat, e.latlng.lng));
-  if(points.length === 3) plotCurvePoints(points[0], points[1], points[2]);
-  else document.getElementById('geomResults').innerText = `Pontos manuais: ${points.length} (adicione ${3-points.length})`;
-});
+}
 
-/* ---------- button handlers ---------- */
-document.getElementById('btnUndo').addEventListener('click', ()=>{
-  if(manualMarkers.length){
-    try{ map.removeLayer(manualMarkers.pop()); }catch(e){}
-    points.pop();
-    document.getElementById('geomResults').innerText = points.length ? `Pontos: ${points.length}` : 'Aguardando pontos...';
-  } else showTileError('Nada para desfazer (pontos manuais).',1600);
-});
-document.getElementById('btnClear').addEventListener('click', ()=>{
-  try{ recordedGroup.clearLayers(); }catch(e){}
-  manualMarkers=[]; points=[]; track=[]; try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){} trackLine=null;
-  document.getElementById('geomResults').innerHTML = 'Aguardando pontos ou gravação...';
-  if(liveMarker && liveMarker.getLatLng){ const p=liveMarker.getLatLng(); map.setView([p.lat,p.lng],17);} else map.setView([-21.050964,-50.845963],15);
-});
-document.getElementById('btnCenter').addEventListener('click', ()=>{ if(liveMarker && liveMarker.getLatLng()){ const p=liveMarker.getLatLng(); map.setView([p.lat,p.lng],17); showTileError('Centralizado no GPS',1200);} else showTileError('GPS ainda não disponível',2000); });
-
-/* ---------- recording ---------- */
-document.getElementById('btnRecord').addEventListener('click', ()=>{
-  recording = !recording;
-  const btn = document.getElementById('btnRecord'); btn.textContent = recording ? 'Parar Gravação' : 'Gravar Movimento';
-  if(recording){
-    track = []; try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){} trackLine=null;
-    if(liveMarker && liveMarker.getLatLng()){ const p=liveMarker.getLatLng(); track.push({lat:p.lat,lng:p.lng,ts:Date.now()}); }
-    showTileError('Gravação iniciada (GPS)...',1300);
-  } else {
-    if(track.length < 3){ alert('Track curto: registre um percurso maior ou adicione 3 pontos manualmente.'); redrawRecordingLine(); return; }
-    const sel = selectThreeFromTrack(track);
-    if(sel){ plotCurvePoints(sel.start, sel.mid, sel.end); try{ const bounds = L.latLngBounds(track.map(p=>[p.lat,p.lng])); map.fitBounds(bounds.pad(0.2)); }catch(e){} showTileError('Gravação finalizada — curva plotada.',2000); }
-    else alert('Não foi possível selecionar 3 pontos automaticamente.');
-  }
-});
-
-/* ---------- core calculation & rounding ---------- */
+/* core calculation returns center */
 function calcularGeometria(){
-  const el = document.getElementById('geomResults');
-  if(!points || points.length < 3){ el.innerHTML = 'Aguardando 3 pontos.'; return null; }
+  if(!points || points.length < 3){ setOverlay(null, null, null, null, null, 'Aguardando 3 pontos'); return null; }
   const p1 = points[0], p2 = points[1], p3 = points[2];
-  // corda (m)
-  const c = haversineKm(p1.lat,p1.lng,p3.lat,p3.lng)*1000;
-  // midpoint approx
+  const c = haversineKm(p1.lat,p1.lng,p3.lat,p3.lng) * 1000;
   const midLat = (p1.lat + p3.lat)/2, midLng = (p1.lng + p3.lng)/2;
-  // sagita (m)
-  const s = haversineKm(p2.lat,p2.lng, midLat, midLng)*1000;
-  if(s === 0){ el.innerHTML = '<span style="color:#e74c3c">Sagita zero — escolha outros pontos</span>'; return null; }
-  // raio
+  const s = haversineKm(p2.lat,p2.lng, midLat, midLng) * 1000;
+  if(s === 0){ setOverlay(null, null, null, null, null, 'Sagita zero — escolha outros pontos'); return null; }
   const R = (c*c)/(8*s) + s/2;
-  // angle (deg)
   const theta = 2 * Math.asin(Math.min(1, c/(2*R)));
   const deltaDeg = theta * 180/Math.PI;
   const arcLen = R * theta;
 
-  // physics speed
   const mu = parseFloat(document.getElementById('atrito').value || 0.7);
   const vehicleFactor = parseFloat(document.getElementById('veiculo').value || 1.0);
-  const marginFactor = parseFloat(document.getElementById('margem').value || 0.78);
-  const g = 9.81;
-  const vmax = Math.sqrt(mu * g * R); // m/s
+  const marginFactor = 0.78;
+  const vmax = Math.sqrt(mu * G * R);
   const vrecom_m_s = vmax * vehicleFactor * marginFactor;
   const vrecom_kmh_raw = vrecom_m_s * 3.6;
-  // rounding rules: floor to nearest 5
   const vrecom_kmh = floorToNearest5(vrecom_kmh_raw);
-  // velocidade segura: VR - 5 (but not negative)
   const vs_kmh = Math.max(0, vrecom_kmh - 5);
 
-  el.innerHTML = `<b>Raio (R):</b> ${R.toFixed(2)} m<br>
-  <b>Δ:</b> ${deltaDeg.toFixed(2)}° — <b>Arco:</b> ${arcLen.toFixed(2)} m<br>
-  <b>Sagita:</b> ${s.toFixed(2)} m — <b>Corda:</b> ${c.toFixed(2)} m
-  <hr style="margin:8px 0">
-  <b>Velocidade Recomendada (VR):</b> ${vrecom_kmh} km/h<br>
-  <b>Velocidade Segura (VS = VR - 5):</b> ${vs_kmh} km/h
-  `;
-
-  return { R, deltaDeg, arcLen, s, c, vrecom_kmh_raw, vrecom_kmh, vs_kmh, mu, vehicleFactor, marginFactor };
-}
-
-/* ---------- Calculate button ---------- */
-document.getElementById('btnCalc').addEventListener('click', ()=>{
-  const res = calcularGeometria();
-  if(res) showTileError('Cálculo atualizado.', 1200);
-});
-
-/* ---------- WhatsApp sharing (VR/VS labels) ---------- */
-document.getElementById('btnWA').addEventListener('click', ()=>{
-  const res = calcularGeometria();
-  if(!res){ alert('Defina 3 pontos antes de compartilhar.'); return; }
-  // center for link: circumcenter approximation using average method (robust fallback)
-  const p1 = points[0], p2 = points[1], p3 = points[2];
   const center = (function(a,b,c){
     const latRef = (a.lat + b.lat + c.lat)/3;
-    function toXY(pt){ const R=6371000; return { x: pt.lng*Math.PI/180*R*Math.cos(latRef*Math.PI/180), y: pt.lat*Math.PI/180*R }; }
+    function toXY(pt){ const Rm=6371000; return { x: pt.lng*Math.PI/180*Rm*Math.cos(latRef*Math.PI/180), y: pt.lat*Math.PI/180*Rm }; }
     const A=toXY(a), B=toXY(b), C=toXY(c);
     const x1=A.x,y1=A.y,x2=B.x,y2=B.y,x3=C.x,y3=C.y;
     const D = 2*(x1*(y2-y3)+x2*(y3-y1)+x3*(y1-y2));
-    if(Math.abs(D) < 1e-6) return null;
+    if(Math.abs(D) < 1e-6) return { lat:(a.lat + c.lat)/2, lng:(a.lng + c.lng)/2 };
     const x1sq=x1*x1+y1*y1, x2sq=x2*x2+y2*y2, x3sq=x3*x3+y3*y3;
-    const ux=(x1sq*(y2-y3)+x2sq*(y3-y1)+x3sq*(y1-y2))/D;
-    const uy=(x1sq*(x3-x2)+x2sq*(x1-x3)+x3sq*(x2-x1))/D;
+    const ux = (x1sq*(y2-y3)+x2sq*(y3-y1)+x3sq*(y1-y2))/D;
+    const uy = (x1sq*(x3-x2)+x2sq*(x1-x3)+x3sq*(x2-x1))/D;
     const Rm = 6371000;
     return { lat: (uy/Rm)*180/Math.PI, lng: (ux/(Rm*Math.cos(latRef*Math.PI/180)))*180/Math.PI };
-  })(p1,p2,p3) || { lat:(p1.lat+p3.lat)/2, lng:(p1.lng+p3.lng)/2 };
+  })(p1,p2,p3);
 
-  const lat = center.lat.toFixed(6), lng = center.lng.toFixed(6);
-  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-  // get VR/VS from last calculation displayed
-  const geom = calcularGeometria();
-  if(!geom) return;
-  const VR = geom.vrecom_kmh; const VS = geom.vs_kmh;
-  const message = `Link:\n${mapsLink}\nVR: ${VR} km/h\nVS: ${VS} km/h`;
-  const wa = `https://wa.me/?text=${encodeURIComponent(message)}`;
-  window.open(wa, '_blank');
+  const res = { R, deltaDeg, arcLen, s, c, vrecom_kmh_raw, vrecom_kmh, vs_kmh, center };
+  setOverlay(res.center, res.vrecom_kmh, res.vs_kmh, res.R, res.deltaDeg, 'Curva calculada');
+  return res;
+}
+
+/* Calculate button */
+document.getElementById('btnCalc').addEventListener('click', ()=> {
+  const r = calcularGeometria();
+  if(!r) alert('Defina 3 pontos (manual) ou grave movimento e pare para cálculo.');
 });
 
-/* ---------- Generate PNG (A4) ---------- */
+/* WhatsApp sharing */
+document.getElementById('btnWA').addEventListener('click', ()=>{
+  const geom = calcularGeometria();
+  if(!geom){ alert('Defina curva antes de compartilhar.'); return; }
+  const center = geom.center;
+  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${center.lat.toFixed(6)},${center.lng.toFixed(6)}`;
+  const message = `Link:\n${mapsLink}\nVR: ${geom.vrecom_kmh} km/h\nVS: ${geom.vs_kmh} km/h`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+});
+
+/* ========== PNG export: capture map canvas + overlay & centered footer ========== */
 document.getElementById('btnPNG').addEventListener('click', async ()=>{
   const geom = calcularGeometria();
-  if(!geom){ alert('Defina 3 pontos antes de gerar imagem.'); return; }
+  if(!geom){ alert('Defina curva antes de gerar PNG.'); return; }
 
-  // A4 at 300 DPI ≈ 2480 x 3508 px (portrait)
-  const A4_W = 2480, A4_H = 3508;
-  const canvas = document.createElement('canvas');
-  canvas.width = A4_W; canvas.height = A4_H;
-  const ctx = canvas.getContext('2d');
-
-  // background white
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,A4_W,A4_H);
-
-  // Title
-  ctx.fillStyle = '#1f2937'; ctx.font = '48px sans-serif'; ctx.fillText('Safe Turn — Resultado', 60, 80);
-
-  // Prepare to capture map area with html2canvas
-  const mapEl = document.getElementById('map');
-  try{
-    // capture map as bitmap (may be limited by CORS for tiles)
-    const mapCanvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: null, scale: 1 });
-    // compute target area: use 80% width of page for map area and keep aspect
-    const marginX = 60, marginTop = 120;
-    const targetW = Math.floor((A4_W - marginX*2) * 0.80); // 80% of available width
-    const aspect = mapCanvas.width / mapCanvas.height;
-    const targetH = Math.floor(targetW / aspect);
-    // draw map centered horizontally
-    const mapX = Math.floor((A4_W - targetW)/2);
-    ctx.drawImage(mapCanvas, 0, 0, mapCanvas.width, mapCanvas.height, mapX, marginTop, targetW, targetH);
-    // add small caption
-    ctx.fillStyle = '#444'; ctx.font = '18px sans-serif';
-    ctx.fillText('Mapa (80% aproveitamento da largura)', mapX, marginTop + targetH + 22);
-    // text block on right/below
-    const textStartY = marginTop + targetH + 60;
-    const leftTextX = 80;
-    ctx.fillStyle='#222'; ctx.font = '22px sans-serif';
-    ctx.fillText(`Raio (R): ${geom.R.toFixed(2)} m`, leftTextX, textStartY);
-    ctx.fillText(`Δ: ${geom.deltaDeg.toFixed(2)}°`, leftTextX, textStartY + 34);
-    ctx.fillText(`Arco: ${geom.arcLen.toFixed(2)} m`, leftTextX, textStartY + 68);
-    ctx.fillText(`Sagita: ${geom.s.toFixed(2)} m`, leftTextX, textStartY + 102);
-    ctx.fillText(`Corda: ${geom.c.toFixed(2)} m`, leftTextX, textStartY + 136);
-    ctx.fillText(`VR: ${geom.vrecom_kmh} km/h`, leftTextX, textStartY + 186);
-    ctx.fillText(`VS: ${geom.vs_kmh} km/h`, leftTextX, textStartY + 220);
-  } catch(e){
-    console.warn('PNG generation: capture failed, rendering text-only', e);
-    ctx.fillStyle='#222'; ctx.font='20px sans-serif';
-    ctx.fillText('Não foi possível capturar o mapa (CORS ou tiles).', 80, 160);
-    ctx.fillText(`Raio (R): ${geom.R.toFixed(2)} m`, 80, 220);
-    ctx.fillText(`Δ: ${geom.deltaDeg.toFixed(2)}°`, 80, 260);
-    ctx.fillText(`Arco: ${geom.arcLen.toFixed(2)} m`, 80, 300);
-    ctx.fillText(`Sagita: ${geom.s.toFixed(2)} m`, 80, 340);
-    ctx.fillText(`Corda: ${geom.c.toFixed(2)} m`, 80, 380);
-    ctx.fillText(`VR: ${geom.vrecom_kmh} km/h`, 80, 440);
-    ctx.fillText(`VS: ${geom.vs_kmh} km/h`, 80, 480);
+  if(typeof leafletImage !== 'function'){
+    alert('leaflet-image não disponível — verifique conexão.');
+    return;
   }
 
-  // footer
-  ctx.fillStyle='#666'; ctx.font='16px sans-serif';
-  ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', 60, A4_H - 60);
+  try{
+    await new Promise((resolve, reject) => {
+      leafletImage(map, function(err, mapCanvas){
+        if(err || !mapCanvas) return reject(err || new Error('leaflet-image falhou'));
+        try{
+          // create final canvas same size as mapCanvas
+          const final = document.createElement('canvas');
+          final.width = mapCanvas.width;
+          final.height = mapCanvas.height;
+          const ctx = final.getContext('2d');
 
-  // trigger download
-  canvas.toBlob(function(blob){
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'SafeTurn_result.png';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=> URL.revokeObjectURL(url), 1000);
-  }, 'image/png');
+          // draw map
+          ctx.drawImage(mapCanvas, 0, 0);
+
+          // overlay box scaled to canvas (compact)
+          const padding = Math.round(final.width * 0.03);
+          const boxW = Math.max(140, Math.round(final.width * 0.18)); // 18% width minimum 140px
+          const boxX = padding;
+          const boxH = Math.round(final.height * 0.14);
+          const boxY = final.height - padding - boxH - 18; // leave extra 18px for footer
+          ctx.fillStyle = 'rgba(255,255,255,0.92)';
+          roundRect(ctx, boxX, boxY, boxW, boxH, 8, true, false);
+
+          // text inside panel (responsive sizes)
+          ctx.fillStyle = '#111';
+          ctx.font = Math.max(10, Math.round(final.width*0.014)) + 'px sans-serif';
+          const lineStartX = boxX + 8;
+          let y = boxY + 18;
+          ctx.fillText(`Centro: ${geom.center.lat.toFixed(6)}, ${geom.center.lng.toFixed(6)}`, lineStartX, y); y += 18;
+          ctx.fillText(`VR: ${geom.vrecom_kmh} km/h`, lineStartX, y); y += 18;
+          ctx.fillText(`VS: ${geom.vs_kmh} km/h`, lineStartX, y); y += 18;
+          ctx.fillText(`Raio: ${geom.R.toFixed(2)} m`, lineStartX, y); y += 18;
+          ctx.fillText(`Δ: ${geom.deltaDeg.toFixed(2)}°`, lineStartX, y);
+
+          // centered discrete footer (above bottom)
+          ctx.fillStyle = 'rgba(255,255,255,0.92)';
+          ctx.font = Math.max(10, Math.round(final.width*0.012)) + 'px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', final.width / 2, final.height - 10);
+          ctx.textAlign = 'left';
+
+          // download
+          final.toBlob(function(blob){
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'SafeTurn_map.png';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(()=> URL.revokeObjectURL(url), 1500);
+          }, 'image/png');
+
+          resolve();
+        } catch(drawErr){
+          reject(drawErr);
+        }
+      });
+    });
+  } catch(e){
+    console.warn('capture failed, fallback vector-only drawing', e);
+    try{
+      const size = map.getSize();
+      const final = document.createElement('canvas');
+      final.width = size.x; final.height = size.y;
+      const ctx = final.getContext('2d');
+      // background
+      ctx.fillStyle = '#e9eef2'; ctx.fillRect(0,0,final.width,final.height);
+
+      // draw track (if any)
+      if(track && track.length){
+        ctx.strokeStyle = 'red'; ctx.lineWidth = 4; ctx.beginPath();
+        for(let i=0;i<track.length;i++){
+          const pt = map.latLngToContainerPoint([track[i].lat, track[i].lng]);
+          if(i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.stroke();
+      }
+
+      // curve points & arrow (if any)
+      if(points && points.length === 3){
+        ctx.setLineDash([8,6]); ctx.strokeStyle = '#8e44ad'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        for(let i=0;i<3;i++){
+          const pt = map.latLngToContainerPoint(points[i]);
+          if(i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.stroke(); ctx.setLineDash([]);
+        const end = map.latLngToContainerPoint(points[2]);
+        ctx.fillStyle = '#8e44ad'; ctx.beginPath(); ctx.moveTo(end.x, end.y); ctx.lineTo(end.x-14, end.y-16); ctx.lineTo(end.x+14, end.y-16); ctx.closePath(); ctx.fill();
+        for(let i=0;i<3;i++){
+          const m = map.latLngToContainerPoint(points[i]);
+          ctx.fillStyle = (i===1? '#f1c40f' : (i===0? '#2ecc71' : '#3498db'));
+          ctx.beginPath(); ctx.arc(m.x, m.y, 6, 0, Math.PI*2); ctx.fill();
+        }
+      }
+
+      // overlay panel (bottom-left smaller)
+      const padding = Math.round(final.width * 0.03);
+      const boxW = Math.max(140, Math.round(final.width * 0.18));
+      const boxX = padding;
+      const boxH = Math.round(final.height * 0.14);
+      const boxY = final.height - padding - boxH - 18;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)'; roundRect(ctx, boxX, boxY, boxW, boxH, 8, true, false);
+      ctx.fillStyle = '#111'; ctx.font = '14px sans-serif';
+      ctx.fillText(`Centro: ${geom.center.lat.toFixed(6)}, ${geom.center.lng.toFixed(6)}`, boxX + 8, boxY + 24);
+      ctx.fillStyle = '#444'; ctx.font = '13px sans-serif';
+      ctx.fillText(`VR: ${geom.vrecom_kmh} km/h`, boxX + 8, boxY + 44);
+      ctx.fillText(`VS: ${geom.vs_kmh} km/h`, boxX + 8, boxY + 62);
+      ctx.fillText(`Raio: ${geom.R.toFixed(2)} m`, boxX + 8, boxY + 80);
+      ctx.fillText(`Δ: ${geom.deltaDeg.toFixed(2)}°`, boxX + 8, boxY + 98);
+
+      // centered footer
+      ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', final.width / 2, final.height - 10);
+      ctx.textAlign = 'left';
+
+      final.toBlob(function(blob){
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'SafeTurn_map_fallback.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=> URL.revokeObjectURL(url), 1500);
+      }, 'image/png');
+
+    } catch(err){
+      alert('Erro ao gerar imagem: ' + (err && err.message ? err.message : err));
+    }
+  }
 });
 
-/* ---------- precache (client-side) - unchanged from before ---------- */
-function deg2tile(lat_deg, lon_deg, z){
-  const n = Math.pow(2, z);
-  const xt = n * ((lon_deg + 180) / 360);
-  const lat_rad = lat_deg * Math.PI/180;
-  const yt = n * (1 - (Math.log(Math.tan(lat_rad) + 1 / Math.cos(lat_rad)) / Math.PI)) / 2;
-  return {x: xt, y: yt};
-}
-function tile2deg(x,y,z){
-  const n = Math.pow(2,z);
-  const lon = x / n * 360 - 180;
-  const lat_rad = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n)));
-  return {lat: lat_rad * 180/Math.PI, lon};
-}
-function bbox_for_radius(lat, lon, radius_km){
-  const R = 6371.0;
-  const dlat = (radius_km / R) * (180/Math.PI);
-  const dlon = (radius_km / R) * (180/Math.PI) / Math.cos(lat * Math.PI/180);
-  return {latMin: lat - dlat, latMax: lat + dlat, lonMin: lon - dlon, lonMax: lon + dlon};
-}
-function makeTileListFiltered(centerLat, centerLon, radiusKm, z){
-  const bbox = bbox_for_radius(centerLat, centerLon, radiusKm);
-  const t1 = deg2tile(bbox.latMax, bbox.lonMin, z);
-  const t2 = deg2tile(bbox.latMin, bbox.lonMax, z);
-  const xMin = Math.floor(Math.min(t1.x, t2.x));
-  const xMax = Math.ceil(Math.max(t1.x, t2.x));
-  const yMin = Math.floor(Math.min(t1.y, t2.y));
-  const yMax = Math.ceil(Math.max(t1.y, t2.y));
-  const tiles = [];
-  for(let x = xMin; x <= xMax; x++){
-    for(let y = yMin; y <= yMax; y++){
-      const center = tile2deg(x + 0.5, y + 0.5, z);
-      const d = haversineKm(centerLat, centerLon, center.lat, center.lon);
-      if(d <= radiusKm * 1.05) tiles.push({z, x, y});
-    }
-  }
-  return {tiles, bbox: {xMin, xMax, yMin, yMax, latMin: bbox.latMin, latMax: bbox.latMax, lonMin: bbox.lonMin, lonMax: bbox.lonMax}};
-}
-async function precacheTilesAroundPosition(lat, lon, radiusKm=PRECACHE_RADIUS_KM, z=PRECACHE_ZOOM){
-  const {tiles, bbox} = makeTileListFiltered(lat, lon, radiusKm, z);
-  const total = tiles.length;
-  if(total === 0){ alert('Nenhum tile para baixar.'); return; }
-  const estKb = Math.round(total * 30);
-  const estMb = (estKb/1024).toFixed(1);
-  if(!confirm(`Será feito download de ${total} tiles (zoom ${z}) — estimativa ~${estMb} MB. Deseja continuar?`)) return;
-  const prog = document.getElementById('tilePrecacheProgress'); prog.style.display = 'block';
-  const textEl = document.getElementById('tilePrecacheText'); const fillEl = document.getElementById('tilePrecacheBarFill');
-  textEl.innerText = `0 / ${total}`; fillEl.style.width='0%';
-  const cache = await caches.open(PRECACHE_CACHE_NAME);
-  let completed = 0, failed = 0;
-  const queue = tiles.slice();
-  async function worker(){
-    while(true){
-      const item = queue.shift(); if(!item) break;
-      const url = TILE_PROVIDER.replace('{z}', item.z).replace('{y}', item.y).replace('{x}', item.x);
-      try{
-        const resp = await fetch(url, { mode:'cors', cache:'no-store' });
-        if(resp && resp.status === 200){ await cache.put(url, resp.clone()); completed++; }
-        else { failed++; console.warn('tile fail', url, resp && resp.status); }
-      } catch(e){ failed++; console.warn('tile err', url, e); }
-      const done = completed + failed;
-      textEl.innerText = `${done} / ${total} (${completed} OK, ${failed} falhas)`;
-      fillEl.style.width = Math.round((done/total)*100) + '%';
-      await new Promise(r=>setTimeout(r, RATE_DELAY));
-    }
-  }
-  const workers=[]; for(let i=0;i<CONCURRENCY;i++) workers.push(worker());
-  await Promise.all(workers);
-  textEl.innerText = `Concluído: ${completed} OK, ${failed} falhas (total ${total}).`;
-  setTimeout(()=> prog.style.display='none', 2500);
-  const bboxMeta = { lat, lon, radiusKm, zoom: z, tilesCount: total, bbox };
-  await cache.put('/tiles_precache_meta.json', new Response(JSON.stringify(bboxMeta)));
-  return {completed, failed, total, bboxMeta};
-}
-let _precachedOnce=false;
-function tryAutoPrecacheOnFirstFix(lat, lon){
-  if(_precachedOnce) return;
-  _precachedOnce=true;
-  setTimeout(()=> { precacheTilesAroundPosition(lat, lon, PRECACHE_RADIUS_KM, PRECACHE_ZOOM).then(r=>console.log('precache done',r)).catch(e=>console.warn('precache err',e)); }, 700);
+/* helper to draw rounded rectangle */
+function roundRect(ctx, x, y, w, h, r, fill, stroke){
+  if (typeof r === 'undefined') r = 5;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y,     x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x,     y + h, r);
+  ctx.arcTo(x,     y + h, x,     y,     r);
+  ctx.arcTo(x,     y,     x + w, y,     r);
+  ctx.closePath();
+  if(fill) ctx.fill();
+  if(stroke) ctx.stroke();
 }
 
+/* init overlay defaults */
+setOverlay(null, null, null, null, null, 'Aguardando 3 pontos ou gravação');
+
 /* expose for debug */
-window.SafeTurn = { precacheTilesAroundPosition, calcularGeometria };
+window.SafeTurn = { calcularGeometria };
+
 </script>
 </body>
 </html>
