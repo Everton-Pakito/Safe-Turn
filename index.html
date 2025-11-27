@@ -19,49 +19,41 @@
     font-size:16px; color:#fff; font-weight:700; backdrop-filter: blur(4px);
     pointer-events:none;
   }
-  /* Floating controls (below title) */
-  .floating-controls{
-    position:fixed; left:12px; top:52px; z-index:4500;
-    background:rgba(255,255,255,0.92); border-radius:10px; padding:8px;
-    box-shadow:0 6px 18px rgba(0,0,0,.18); display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+  /* Compact collapsible menu (right interior) */
+  .menu-wrapper{
+    position:fixed; right:12px; bottom:18px; z-index:4500; display:flex; flex-direction:column; align-items:flex-end;
   }
-  .floating-controls button, .floating-controls select{
-    font-size:13px; padding:8px; border-radius:7px; border:1px solid #ddd;
-    cursor:pointer; background:#fff; color:#111;
+  .menu-handle{
+    width:54px; height:54px; border-radius:28px; background:var(--accent); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,0.28); border:none;
   }
-  .floating-controls button.primary{ background:var(--accent); color:#fff; border:none }
-  /* GPS hint popup (top-center) */
-  .gps-hint{
-    position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:4600;
-    background:rgba(255,255,255,0.96); padding:10px 14px; border-radius:8px;
-    box-shadow:0 6px 20px rgba(0,0,0,0.25); font-size:14px; color:#111;
-    display:flex; gap:10px; align-items:center;
+  .menu-panel{
+    margin-bottom:10px; transition:all .28s ease; transform-origin:right bottom;
+    background:rgba(255,255,255,0.96); color:#111; border-radius:10px; padding:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.28); width:320px;
+    display:flex; flex-direction:column; gap:8px; align-items:stretch;
   }
-  .gps-hint button{ background:var(--accent); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+  .menu-panel.hidden{ opacity:0; transform:scale(.96); pointer-events:none; height:0; margin:0; padding:0; width:54px }
+  .menu-row{ display:flex; gap:8px; align-items:center; justify-content:space-between; }
+  .menu-row .left{ display:flex; gap:8px; align-items:center; }
+  .control-btn{
+    padding:8px 10px; border-radius:8px; border:1px solid #ddd; background:#fff; color:#111; cursor:pointer; font-size:13px;
+  }
+  .control-btn.primary{ background:var(--accent); color:#fff; border:none; }
+  .control-small{ padding:6px 8px; border-radius:6px; font-size:12px; background:#fff; color:#111; border:1px solid #ddd; cursor:pointer }
+  .select-small{ padding:6px 8px; border-radius:6px; font-size:13px; }
+  .menu-title{ font-weight:700; font-size:14px; color:#222; margin-bottom:2px }
   /* Result box: centered horizontal above footer (two lines) */
   .map-overlay{
-    position:fixed;
-    left:50%;
-    transform:translateX(-50%);
-    bottom:42px; /* above footer */
-    z-index:4200;
-    background:rgba(255,255,255,0.96);
-    border-radius:10px;
-    padding:10px 16px;
-    min-width:260px;
-    max-width:92%;
-    box-shadow:0 6px 18px rgba(0,0,0,0.28);
-    color:#111;
-    text-align:center;
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-    align-items:center;
-    font-size:13px;
-    line-height:1.2;
+    position:fixed; left:50%; transform:translateX(-50%); bottom:42px; z-index:4200;
+    background:rgba(255,255,255,0.96); border-radius:10px; padding:10px 16px;
+    min-width:260px; max-width:92%; box-shadow:0 6px 18px rgba(0,0,0,0.28);
+    color:#111; text-align:center; display:flex; flex-direction:column; gap:6px; align-items:center;
+    font-size:13px; line-height:1.2;
   }
   .map-overlay .row{ width:100%; display:flex; justify-content:center; gap:12px; align-items:center; flex-wrap:wrap }
-  .map-overlay .txt { font-weight:700; color:#000; }
+  .map-overlay .txt { font-weight:700; color:#000; word-break:break-word; }
   .map-overlay .sub { font-weight:600; color:#333; font-size:12px; }
   /* Footer centered discreet */
   #footerApp{
@@ -69,13 +61,11 @@
     font-size:11px; color:rgba(255,255,255,0.92); z-index:4200; text-shadow:0 0 6px rgba(0,0,0,0.5);
     pointer-events:none;
   }
-  @media (max-width:700px){
-    #appTitle{ top:8px; left:8px; font-size:14px }
-    .floating-controls{ left:8px; top:46px; padding:6px }
+  .muted{ color:#666; font-size:12px }
+  @media (max-width:520px){
+    .menu-panel{ width:92vw; right:8px }
     .map-overlay{ bottom:54px; padding:8px; min-width:200px; font-size:12px }
-    .gps-hint{ font-size:13px; padding:8px }
   }
-  @media print { .floating-controls, .gps-hint { display:none } }
 </style>
 </head>
 <body>
@@ -85,47 +75,76 @@
 <!-- App title top-left -->
 <div id="appTitle">Safe Turn</div>
 
-<!-- floating controls -->
-<div class="floating-controls" id="controls" role="region" aria-label="Controles">
-  <button id="btnRecord" class="primary">Gravar Movimento</button>
-  <button id="btnUndo">Desfazer</button>
-  <button id="btnClear">Limpar</button>
-  <button id="btnCenter">Centralizar GPS</button>
+<!-- collapsible menu (right-bottom) -->
+<div class="menu-wrapper" id="menuWrapper" aria-label="Menu">
+  <div id="menuPanel" class="menu-panel hidden" role="region" aria-hidden="true">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div class="menu-title">Controles</div>
+        <div class="muted" style="margin-top:2px">Toque para expandir/ocultar</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button id="btnCloseMenu" class="control-small" title="Fechar">✕</button>
+      </div>
+    </div>
 
-  <label style="display:flex;align-items:center;gap:6px">
-    Atrito
-    <select id="atrito" title="coeficiente de atrito">
-      <option value="0.7">0.7</option>
-      <option value="0.5">0.5</option>
-      <option value="0.4">0.4</option>
-      <option value="0.25">0.25</option>
-    </select>
-  </label>
+    <div class="menu-row">
+      <div class="left">
+        <button id="btnRecord" class="control-btn primary">Gravar</button>
+        <button id="btnUndo" class="control-btn">Desfazer</button>
+      </div>
+      <div>
+        <button id="btnClear" class="control-small">Limpar</button>
+      </div>
+    </div>
 
-  <label style="display:flex;align-items:center;gap:6px">
-    Veículo
-    <select id="veiculo" title="fator veículo">
-      <option value="1">Padrão</option>
-      <option value="0.75">Pesado</option>
-    </select>
-  </label>
+    <div class="menu-row">
+      <div class="left">
+        <label class="muted">Atrito</label>
+        <select id="atrito" class="select-small">
+          <option value="0.7">0.7</option>
+          <option value="0.5">0.5</option>
+          <option value="0.4">0.4</option>
+          <option value="0.25">0.25</option>
+        </select>
+        <label class="muted">Veículo</label>
+        <select id="veiculo" class="select-small">
+          <option value="1">Padrão</option>
+          <option value="0.75">Pesado</option>
+        </select>
+      </div>
+    </div>
 
-  <button id="btnCalc">Calcular</button>
-  <button id="btnPNG">Gerar PNG</button>
-  <button id="btnWA">WhatsApp</button>
+    <div class="menu-row">
+      <div class="left">
+        <button id="btnCalc" class="control-btn">Calcular</button>
+        <button id="btnCenter" class="control-btn">Centralizar</button>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button id="btnCopy" class="control-small" title="Copiar dados">Copiar Dados</button>
+        <button id="btnWA" class="control-small" title="Compartilhar via WhatsApp">WhatsApp</button>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+      <div class="muted">Exportar</div>
+      <div style="display:flex;gap:8px">
+        <button id="btnPNG" class="control-small">Gerar PNG</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- handle (always visible) -->
+  <button id="menuHandle" class="menu-handle" aria-expanded="false" aria-controls="menuPanel" title="Abrir menu">
+    <span id="menuChevron" style="transform: rotate(0deg); display:inline-block;">❯</span>
+  </button>
 </div>
 
-<!-- gps hint popup (shows until closed) -->
-<div id="gpsHint" class="gps-hint" style="display:none" role="dialog" aria-live="polite">
-  <div style="max-width:640px">Dica: ative <strong>Alta precisão</strong> no GPS do seu dispositivo para melhor fix. Clique 3 pontos manualmente ou grave um movimento para mapear a curva.</div>
-  <div style="margin-left:6px"><button id="gpsHintClose">OK</button></div>
-</div>
-
-<!-- overlay centered above footer with two lines -->
+<!-- overlay centered above footer with two lines (linkable) -->
 <div class="map-overlay" id="mapOverlay" aria-live="polite">
-  <div class="row"><div class="sub">Lat - Long:</div></div>
+  <div class="row"><div class="sub">Localização</div></div>
   <div class="row"><div id="ovCenter" class="txt">-</div></div>
-  <div class="row" style="margin-top:2px;"><div class="sub">Raio - Ângulo:</div></div>
+  <div class="row" style="margin-top:4px;"><div class="sub">Raio - Ângulo</div></div>
   <div class="row"><div id="ovRaioAng" class="txt">-</div></div>
 </div>
 
@@ -141,6 +160,7 @@
 /* ================== Helpers & Config ================== */
 const TILE_PROVIDER = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const G = 9.81;
+
 function haversineKm(aLat,aLng,bLat,bLng){
   const R=6371; const dLat=(bLat-aLat)*Math.PI/180; const dLon=(bLng-aLng)*Math.PI/180;
   const A = Math.sin(dLat/2)**2 + Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*Math.sin(dLon/2)**2;
@@ -149,22 +169,14 @@ function haversineKm(aLat,aLng,bLat,bLng){
 }
 function floorToNearest5(n){ return Math.max(0, Math.floor(n / 5) * 5); }
 
-/* New overlay: two lines only */
-function setOverlayLines(center, R, delta, message){
-  document.getElementById('ovCenter').textContent = center ? `${center.lat.toFixed(6)} - ${center.lng.toFixed(6)}` : '-';
-  document.getElementById('ovRaioAng').textContent = (R ? `${R.toFixed(2)} m` : '-') + '  -  ' + (delta ? `${delta.toFixed(2)}°` : '-');
-  if(message) {
-    // temporarily show message in the overlay subtitle (brief)
-    // We won't block layout; instead we console.log
-    console.log('SafeTurn:', message);
-  }
-}
-
 /* ================== Map init ================== */
 const map = L.map('map', { zoomControl:true }).setView([-21.050964, -50.845963], 15);
 const tileLayer = L.tileLayer(TILE_PROVIDER, { maxZoom:20, crossOrigin:true, errorTileUrl:'/offline-tile.png', attribution:'Esri' }).addTo(map);
 tileLayer.on('tileerror', ()=> console.warn('tile error'));
-const recordedGroup = L.layerGroup().addTo(map);
+
+// groups
+const gpsGroup = L.layerGroup().addTo(map);        // only for live gps marker (not cleared)
+const recordedGroup = L.layerGroup().addTo(map);   // for tracks, manual markers, curves
 
 /* ================== State ================== */
 let liveMarker = null;
@@ -173,16 +185,16 @@ let track = [], trackLine = null, recordingDecorator = null;
 let manualMarkers = [], points = [];
 let curveLine = null, curveDecorator = null;
 
-/* ================== GPS Hint logic ================== */
-const gpsHintEl = document.getElementById('gpsHint');
-const gpsHintCloseBtn = document.getElementById('gpsHintClose');
-if(!localStorage.getItem('safeTurn_gpsHintDismissed')){
-  gpsHintEl.style.display = 'flex';
-}
-gpsHintCloseBtn.addEventListener('click', ()=>{
-  gpsHintEl.style.display = 'none';
-  localStorage.setItem('safeTurn_gpsHintDismissed', '1');
-});
+/* ================== Menu toggle ================== */
+const menuPanel = document.getElementById('menuPanel');
+const menuHandle = document.getElementById('menuHandle');
+const menuChevron = document.getElementById('menuChevron');
+const btnCloseMenu = document.getElementById('btnCloseMenu');
+function openMenu(){ menuPanel.classList.remove('hidden'); menuPanel.setAttribute('aria-hidden','false'); menuHandle.setAttribute('aria-expanded','true'); menuChevron.style.transform='rotate(90deg)'; }
+function closeMenu(){ menuPanel.classList.add('hidden'); menuPanel.setAttribute('aria-hidden','true'); menuHandle.setAttribute('aria-expanded','false'); menuChevron.style.transform='rotate(0deg)'; }
+menuHandle.addEventListener('click', ()=> { if(menuPanel.classList.contains('hidden')) openMenu(); else closeMenu(); });
+btnCloseMenu.addEventListener('click', ()=> closeMenu());
+closeMenu();
 
 /* ================== Geolocation ================== */
 function onGeoErr(err){
@@ -192,9 +204,15 @@ function onGeoErr(err){
 }
 function onPos(p){
   const lat = p.coords.latitude, lng = p.coords.longitude;
-  if(!liveMarker) liveMarker = L.circleMarker([lat,lng], { radius:7, fillColor:'#e74c3c', color:'#c0392b', fillOpacity:0.95 }).addTo(recordedGroup);
-  else liveMarker.setLatLng([lat,lng]);
+
+  if(!liveMarker){
+    liveMarker = L.circleMarker([lat,lng], { radius:7, fillColor:'#e74c3c', color:'#c0392b', fillOpacity:0.95 }).addTo(gpsGroup);
+  } else {
+    liveMarker.setLatLng([lat,lng]);
+  }
+
   if(!map._userCenteredOnce){ map._userCenteredOnce=true; map.setView([lat,lng],17); }
+
   if(recording){
     const last = track.length ? track[track.length-1] : null;
     const cand = {lat,lng,ts: Date.now()};
@@ -206,6 +224,7 @@ function onPos(p){
     }
     redrawRecordingLine();
   }
+
   setOverlayLines(null, null, null, 'GPS OK');
 }
 function startWatch(){
@@ -233,16 +252,18 @@ function redrawRecordingLine(){
   try{ if(recordingDecorator) recordedGroup.removeLayer(recordingDecorator); }catch(e){}
   if(track.length > 0){
     trackLine = L.polyline(track.map(p=>[p.lat,p.lng]), { color:'red', weight:4, opacity:0.95 }).addTo(recordedGroup);
-    recordingDecorator = L.polylineDecorator(trackLine, {
-      patterns: [{offset:'100%', repeat:0, symbol: L.Symbol.arrowHead({pixelSize:14, polygon:true, pathOptions:{color:'red', fillColor:'red', fillOpacity:1}})}]
-    }).addTo(recordedGroup);
+    try{
+      recordingDecorator = L.polylineDecorator(trackLine, {
+        patterns: [{offset:'100%', repeat:0, symbol: L.Symbol.arrowHead({pixelSize:14, polygon:true, pathOptions:{color:'red', fillColor:'red', fillOpacity:1}})}]
+      }).addTo(recordedGroup);
+    }catch(e){ /* decorator optional */ }
   }
 }
 
 /* manual points via click */
 map.on('click', e=>{
   if(points && points.length >= 3) clearCurveOnly();
-  const mk = L.circleMarker(e.latlng, { radius:6, color:'#c0392b', fillColor:'#e74c3c', fillOpacity:0.95 }).addTo(map);
+  const mk = L.circleMarker(e.latlng, { radius:6, color:'#c0392b', fillColor:'#e74c3c', fillOpacity:0.95 }).addTo(recordedGroup);
   manualMarkers.push(mk);
   points.push(L.latLng(e.latlng.lat, e.latlng.lng));
   if(points.length === 3) plotCurvePoints(points[0], points[1], points[2]);
@@ -251,19 +272,31 @@ map.on('click', e=>{
 
 /* undo / clear */
 document.getElementById('btnUndo').addEventListener('click', ()=>{
-  if(manualMarkers.length){ try{ map.removeLayer(manualMarkers.pop()); }catch(e){} points.pop(); setOverlayLines(null, null, null, points.length ? `Pontos: ${points.length}` : 'Aguardando pontos'); }
+  if(manualMarkers.length){ try{ recordedGroup.removeLayer(manualMarkers.pop()); }catch(e){} points.pop(); setOverlayLines(null, null, null, points.length ? `Pontos: ${points.length}` : 'Aguardando pontos'); }
   else setOverlayLines(null, null, null, 'Nada para desfazer');
 });
 document.getElementById('btnClear').addEventListener('click', ()=>{
-  try{ recordedGroup.clearLayers(); }catch(e){}
-  manualMarkers = []; points = []; track = []; try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){} trackLine=null;
+  // clear everything except gpsGroup (which holds liveMarker)
+  recordedGroup.clearLayers();
+  manualMarkers = []; points = []; track = [];
+  try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){}
+  trackLine = null;
+  try{ if(curveLine) recordedGroup.removeLayer(curveLine);}catch(e){}
+  curveLine = null;
+  try{ if(curveDecorator) recordedGroup.removeLayer(curveDecorator);}catch(e){}
+  curveDecorator = null;
+
+  // keep liveMarker, recenter to it
+  if(liveMarker && liveMarker.getLatLng) map.setView(liveMarker.getLatLng(), 17);
+
   setOverlayLines(null, null, null, 'Aguardando pontos ou gravação');
 });
 
 /* record toggle */
 document.getElementById('btnRecord').addEventListener('click', ()=>{
   recording = !recording;
-  document.getElementById('btnRecord').textContent = recording ? 'Parar Gravação' : 'Gravar Movimento';
+  const btn = document.getElementById('btnRecord');
+  btn.textContent = recording ? 'Parar' : 'Gravar';
   if(recording){
     track = []; try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){} trackLine=null;
     if(liveMarker && liveMarker.getLatLng) track.push({lat: liveMarker.getLatLng().lat, lng: liveMarker.getLatLng().lng, ts: Date.now()});
@@ -306,7 +339,7 @@ function selectThreeFromTrack(trk){
 function clearCurveOnly(){
   try{ if(curveLine) recordedGroup.removeLayer(curveLine);}catch(e){}
   try{ if(curveDecorator) recordedGroup.removeLayer(curveDecorator);}catch(e){}
-  manualMarkers.forEach(m=>{ try{ map.removeLayer(m);}catch(e){} });
+  manualMarkers.forEach(m=>{ try{ recordedGroup.removeLayer(m);}catch(e){} });
   manualMarkers = []; curveLine = null; curveDecorator = null; points = [];
   setOverlayLines(null, null, null, 'Aguardando pontos ou gravação');
 }
@@ -374,23 +407,83 @@ function calcularGeometria(){
   return res;
 }
 
-/* Calculate button */
+/* overlay: two-line box with clickable google link */
+function setOverlayLines(center, R, delta, message){
+  const ovCenter = document.getElementById('ovCenter');
+  if(center){
+    const gLink = `https://www.google.com/maps?q=${center.lat.toFixed(6)},${center.lng.toFixed(6)}`;
+    ovCenter.innerHTML = `<a href="${gLink}" target="_blank" rel="noopener" style="color:#1a73e8;text-decoration:underline">${center.lat.toFixed(6)} - ${center.lng.toFixed(6)}</a>`;
+  } else {
+    ovCenter.textContent = '-';
+  }
+  document.getElementById('ovRaioAng').textContent = (R ? `${R.toFixed(2)} m` : '-') + '  -  ' + (delta ? `${delta.toFixed(2)}°` : '-');
+  if(message) console.log('SafeTurn:', message);
+}
+
+/* ========== Buttons: Calc / Copy / WhatsApp / PNG ========== */
 document.getElementById('btnCalc').addEventListener('click', ()=> {
   const r = calcularGeometria();
   if(!r) alert('Defina 3 pontos (manual) ou grave movimento e pare para cálculo.');
 });
 
-/* WhatsApp sharing */
+/* Copy data (clipboard) with Google Maps link */
+document.getElementById('btnCopy').addEventListener('click', async ()=>{
+  const geom = calcularGeometria();
+  if(!geom){ alert('Defina curva antes de copiar.'); return; }
+  const center = geom.center;
+  const gLink = `https://www.google.com/maps?q=${center.lat.toFixed(6)},${center.lng.toFixed(6)}`;
+  const text =
+`Localização:
+${gLink}
+VR: ${geom.vrecom_kmh} km/h
+VS: ${geom.vs_kmh} km/h`;
+  try{
+    await navigator.clipboard.writeText(text);
+    showTemporaryStatus('Copiado para a área de transferência', 1600);
+  }catch(e){
+    // fallback
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand('copy'); showTemporaryStatus('Copiado (fallback)', 1600); }catch(ex){ alert('Erro ao copiar'); }
+    ta.remove();
+  }
+});
+
+/* WhatsApp sharing: message with "Localização:" and google link */
 document.getElementById('btnWA').addEventListener('click', ()=>{
   const geom = calcularGeometria();
   if(!geom){ alert('Defina curva antes de compartilhar.'); return; }
   const center = geom.center;
-  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${center.lat.toFixed(6)},${center.lng.toFixed(6)}`;
-  const message = `Link:\n${mapsLink}\nVR: ${geom.vrecom_kmh} km/h\nVS: ${geom.vs_kmh} km/h`;
+  const gLink = `https://www.google.com/maps?q=${center.lat.toFixed(6)},${center.lng.toFixed(6)}`;
+  const message =
+`Localização:
+${gLink}
+VR: ${geom.vrecom_kmh} km/h
+VS: ${geom.vs_kmh} km/h`;
+  showTemporaryStatus('Compartilhando os dados agora...', 1500);
   window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
 });
 
-/* ========== PNG export: capture map canvas + app name + centered bottom box ========== */
+/* small toast/status */
+function showTemporaryStatus(txt, ms=1200){
+  const s = document.createElement('div');
+  s.textContent = txt;
+  s.style.position='fixed'; s.style.right='16px'; s.style.bottom='86px'; s.style.zIndex=9999;
+  s.style.background='rgba(0,0,0,0.75)'; s.style.color='#fff'; s.style.padding='8px 12px';
+  s.style.borderRadius='8px'; s.style.fontSize='13px'; s.style.boxShadow='0 8px 20px rgba(0,0,0,0.4)';
+  document.body.appendChild(s);
+  setTimeout(()=> { s.style.transition='opacity .3s'; s.style.opacity='0'; setTimeout(()=> s.remove(), 350); }, ms);
+}
+
+/* ================== PNG export: ensure arrow clone is captured ========== */
+function createArrowClone(){
+  if(!curveLine) return null;
+  const latlngs = curveLine.getLatLngs();
+  if(!latlngs || latlngs.length < 2) return null;
+  const a = latlngs[latlngs.length-2];
+  const b = latlngs[latlngs.length-1];
+  return L.polyline([a,b], {color:'#8e44ad', weight:6, opacity:1});
+}
+
 document.getElementById('btnPNG').addEventListener('click', async ()=>{
   const geom = calcularGeometria();
   if(!geom){ alert('Defina curva antes de gerar PNG.'); return; }
@@ -400,6 +493,10 @@ document.getElementById('btnPNG').addEventListener('click', async ()=>{
     return;
   }
 
+  // create arrow clone (if curve exists)
+  const arrowClone = createArrowClone();
+  if(arrowClone) arrowClone.addTo(recordedGroup);
+
   try{
     await new Promise((resolve, reject) => {
       leafletImage(map, function(err, mapCanvas){
@@ -407,45 +504,39 @@ document.getElementById('btnPNG').addEventListener('click', async ()=>{
         try{
           // final canvas
           const final = document.createElement('canvas');
-          final.width = mapCanvas.width;
-          final.height = mapCanvas.height;
+          final.width = mapCanvas.width; final.height = mapCanvas.height;
           const ctx = final.getContext('2d');
-
-          // draw map
           ctx.drawImage(mapCanvas, 0, 0);
 
-          // draw app name top-left (so it appears on the PNG)
+          // draw app name top-left
           ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillRect(10, 10, 110, 34);
+          ctx.fillRect(10, 10, 120, 36);
           ctx.fillStyle = '#fff';
           ctx.font = Math.max(14, Math.round(final.width*0.02)) + 'px sans-serif';
           ctx.fillText('Safe Turn', 18, 34);
 
-          // centered box above footer (two lines)
+          // centered box above footer with two lines
           const boxW = Math.min(final.width - 40, Math.max(260, Math.round(final.width * 0.6)));
           const boxH = Math.round(final.height * 0.12);
           const boxX = (final.width - boxW) / 2;
-          const boxY = final.height - boxH - 36; // leave space for footer
+          const boxY = final.height - boxH - 36;
 
           ctx.fillStyle = 'rgba(255,255,255,0.96)';
           roundRect(ctx, boxX, boxY, boxW, boxH, 12, true, false);
 
-          // text inside box (centered)
-          ctx.fillStyle = '#111';
-          ctx.textAlign = 'center';
+          ctx.fillStyle = '#111'; ctx.textAlign = 'center';
           ctx.font = Math.max(12, Math.round(final.width*0.016)) + 'px sans-serif';
-          ctx.fillText(`${geom.center.lat.toFixed(6)} - ${geom.center.lng.toFixed(6)}`, final.width/2, boxY + Math.round(boxH*0.43));
-          ctx.fillText(`${geom.R.toFixed(2)} m  -  ${geom.deltaDeg.toFixed(2)}°`, final.width/2, boxY + Math.round(boxH*0.78));
+          ctx.fillText(`${geom.center.lat.toFixed(6)} - ${geom.center.lng.toFixed(6)}`, final.width/2, boxY + Math.round(boxH*0.45));
+          ctx.fillText(`${geom.R.toFixed(2)} m  -  ${geom.deltaDeg.toFixed(2)}°`, final.width/2, boxY + Math.round(boxH*0.80));
           ctx.textAlign = 'left';
 
-          // footer centered
+          // footer
           ctx.fillStyle = 'rgba(255,255,255,0.92)';
           ctx.font = Math.max(10, Math.round(final.width*0.012)) + 'px sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', final.width / 2, final.height - 12);
           ctx.textAlign = 'left';
 
-          // download
           final.toBlob(function(blob){
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = 'SafeTurn_map.png';
@@ -456,83 +547,16 @@ document.getElementById('btnPNG').addEventListener('click', async ()=>{
           resolve();
         } catch(drawErr){
           reject(drawErr);
+        } finally {
+          // remove arrow clone from map after capture
+          if(arrowClone) try{ recordedGroup.removeLayer(arrowClone); }catch(e){}
         }
       });
     });
   } catch(e){
-    console.warn('capture failed, fallback vector-only drawing', e);
-    try{
-      // fallback: draw minimal vector version matching layout
-      const size = map.getSize();
-      const final = document.createElement('canvas');
-      final.width = size.x; final.height = size.y;
-      const ctx = final.getContext('2d');
-
-      // simple background
-      ctx.fillStyle = '#e9eef2'; ctx.fillRect(0,0,final.width,final.height);
-
-      // draw track and points (if present)
-      if(track && track.length){
-        ctx.strokeStyle = 'red'; ctx.lineWidth = 4; ctx.beginPath();
-        for(let i=0;i<track.length;i++){
-          const pt = map.latLngToContainerPoint([track[i].lat, track[i].lng]);
-          if(i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
-        }
-        ctx.stroke();
-      }
-      if(points && points.length === 3){
-        ctx.setLineDash([8,6]); ctx.strokeStyle = '#8e44ad'; ctx.lineWidth = 3;
-        ctx.beginPath();
-        for(let i=0;i<3;i++){
-          const pt = map.latLngToContainerPoint(points[i]);
-          if(i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
-        }
-        ctx.stroke(); ctx.setLineDash([]);
-        const end = map.latLngToContainerPoint(points[2]);
-        ctx.fillStyle = '#8e44ad'; ctx.beginPath(); ctx.moveTo(end.x, end.y); ctx.lineTo(end.x-14, end.y-16); ctx.lineTo(end.x+14, end.y-16); ctx.closePath(); ctx.fill();
-        for(let i=0;i<3;i++){
-          const m = map.latLngToContainerPoint(points[i]);
-          ctx.fillStyle = (i===1? '#f1c40f' : (i===0? '#2ecc71' : '#3498db'));
-          ctx.beginPath(); ctx.arc(m.x, m.y, 6, 0, Math.PI*2); ctx.fill();
-        }
-      }
-
-      // app title top-left
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(10,10,110,34);
-      ctx.fillStyle = '#fff'; ctx.font = '18px sans-serif'; ctx.fillText('Safe Turn', 18, 34);
-
-      // centered box above footer
-      const boxW = Math.min(final.width - 40, Math.max(260, Math.round(final.width * 0.6)));
-      const boxH = Math.round(final.height * 0.12);
-      const boxX = (final.width - boxW) / 2;
-      const boxY = final.height - boxH - 36;
-      ctx.fillStyle = 'rgba(255,255,255,0.96)'; roundRect(ctx, boxX, boxY, boxW, boxH, 12, true, false);
-      ctx.fillStyle = '#111'; ctx.textAlign = 'center';
-      // if we have geom values show them, else placeholders
-      const cLat = geom && geom.center ? geom.center.lat.toFixed(6) : '-';
-      const cLng = geom && geom.center ? geom.center.lng.toFixed(6) : '-';
-      const R = geom ? geom.R.toFixed(2) : '-';
-      const d = geom ? geom.deltaDeg.toFixed(2) : '-';
-      ctx.font = '14px sans-serif';
-      ctx.fillText(`${cLat} - ${cLng}`, final.width/2, boxY + Math.round(boxH*0.43));
-      ctx.fillText(`${R} m  -  ${d}°`, final.width/2, boxY + Math.round(boxH*0.78));
-      ctx.textAlign = 'left';
-
-      // footer
-      ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', final.width / 2, final.height - 12);
-      ctx.textAlign = 'left';
-
-      final.toBlob(function(blob){
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'SafeTurn_map_fallback.png';
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(()=> URL.revokeObjectURL(url), 1500);
-      }, 'image/png');
-
-    } catch(err){
-      alert('Erro ao gerar imagem: ' + (err && err.message ? err.message : err));
-    }
+    console.warn('capture failed, fallback drawing', e);
+    showTemporaryStatus('Erro ao gerar PNG', 2000);
+    if(arrowClone) try{ recordedGroup.removeLayer(arrowClone); }catch(e){}
   }
 });
 
