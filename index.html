@@ -8,73 +8,74 @@
 <meta name="theme-color" content="#141414"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-  :root{
-    --accent:#3498db;
-    --muted:#666;
-  }
+  :root{ --accent:#3498db; --muted:#666; }
   html,body{height:100%;margin:0;font-family:Segoe UI, Roboto, Arial;background:#000;color:#fff}
-  /* FULLSCREEN MAP */
+  /* Fullscreen map */
   #map{position:fixed;inset:0;width:100%;height:100vh;z-index:0}
   /* App title top-left */
   #appTitle{
     position:fixed; top:10px; left:12px; z-index:4300;
-    background:rgba(0,0,0,0.55); padding:6px 10px;
-    border-radius:6px; font-size:16px; color:#fff; font-weight:700;
-    backdrop-filter: blur(4px);
+    background:rgba(0,0,0,0.55); padding:6px 10px; border-radius:6px;
+    font-size:16px; color:#fff; font-weight:700; backdrop-filter: blur(4px);
     pointer-events:none;
   }
-  /* Floating controls (top-left, next to title) */
+  /* Floating controls (below title) */
   .floating-controls{
-    position:fixed; left:12px; top:48px; z-index:4500;
+    position:fixed; left:12px; top:52px; z-index:4500;
     background:rgba(255,255,255,0.92); border-radius:10px; padding:8px;
     box-shadow:0 6px 18px rgba(0,0,0,.18); display:flex; gap:6px; flex-wrap:wrap; align-items:center;
   }
   .floating-controls button, .floating-controls select{
-    font-size:13px; padding:8px; border-radius:7px; border:1px solid #ddd; cursor:pointer; background:#fff; color:#111;
+    font-size:13px; padding:8px; border-radius:7px; border:1px solid #ddd;
+    cursor:pointer; background:#fff; color:#111;
   }
-  .floating-controls button.primary{background:var(--accent); color:#fff; border:none}
-  .floating-help{position:fixed; left:12px; bottom:52px; z-index:4500; background:rgba(255,255,255,0.9); padding:6px 8px; border-radius:8px; font-size:12px; color:#333; display:none}
-  /* Popup hint (top-center) */
+  .floating-controls button.primary{ background:var(--accent); color:#fff; border:none }
+  /* GPS hint popup (top-center) */
   .gps-hint{
     position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:4600;
-    background:rgba(255,255,255,0.96); padding:10px 14px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.25);
-    font-size:14px; color:#111; display:flex; gap:10px; align-items:center;
+    background:rgba(255,255,255,0.96); padding:10px 14px; border-radius:8px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25); font-size:14px; color:#111;
+    display:flex; gap:10px; align-items:center;
   }
-  .gps-hint button{background:var(--accent); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer}
-  /* Overlay results (bottom-left smaller and responsive) */
+  .gps-hint button{ background:var(--accent); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+  /* Result box: centered horizontal above footer (two lines) */
   .map-overlay{
     position:fixed;
-    left:12px;
-    bottom:12px;
+    left:50%;
+    transform:translateX(-50%);
+    bottom:42px; /* above footer */
     z-index:4200;
-    background:rgba(255,255,255,0.92);
-    border-radius:8px;
-    padding:10px 12px;
-    width:auto;
-    min-width:160px;
-    max-width:260px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.25);
-    font-size:13px;
+    background:rgba(255,255,255,0.96);
+    border-radius:10px;
+    padding:10px 16px;
+    min-width:260px;
+    max-width:92%;
+    box-shadow:0 6px 18px rgba(0,0,0,0.28);
     color:#111;
-    line-height:1.35;
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    align-items:center;
+    font-size:13px;
+    line-height:1.2;
   }
-  .map-overlay .line{ margin-bottom:6px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
-  .map-overlay .label{ font-size:12px; font-weight:600; color:#333; }
-  .map-overlay .value{ font-size:13px; font-weight:700; color:#000; text-align:right; white-space:nowrap; }
-  /* Footer (centered, discreet) */
+  .map-overlay .row{ width:100%; display:flex; justify-content:center; gap:12px; align-items:center; flex-wrap:wrap }
+  .map-overlay .txt { font-weight:700; color:#000; }
+  .map-overlay .sub { font-weight:600; color:#333; font-size:12px; }
+  /* Footer centered discreet */
   #footerApp{
-    position:fixed; bottom:6px; left:0; right:0;
-    text-align:center; font-size:11px; color:rgba(255,255,255,0.85); z-index:4200;
-    text-shadow:0 0 6px rgba(0,0,0,0.6); pointer-events:none;
+    position:fixed; bottom:6px; left:0; right:0; text-align:center;
+    font-size:11px; color:rgba(255,255,255,0.92); z-index:4200; text-shadow:0 0 6px rgba(0,0,0,0.5);
+    pointer-events:none;
   }
   @media (max-width:700px){
     #appTitle{ top:8px; left:8px; font-size:14px }
-    .floating-controls{ left:8px; top:42px; padding:6px }
-    .floating-controls button, .floating-controls select{ font-size:12px; padding:6px }
-    .map-overlay{ min-width:140px; max-width:220px; padding:8px; font-size:12px }
+    .floating-controls{ left:8px; top:46px; padding:6px }
+    .map-overlay{ bottom:54px; padding:8px; min-width:200px; font-size:12px }
     .gps-hint{ font-size:13px; padding:8px }
   }
-  @media print { .floating-controls, .floating-help, .gps-hint { display:none } }
+  @media print { .floating-controls, .gps-hint { display:none } }
 </style>
 </head>
 <body>
@@ -114,28 +115,21 @@
   <button id="btnWA">WhatsApp</button>
 </div>
 
-<!-- small help (hidden) -->
-<div class="floating-help" id="floatingHelp" style="display:none">Use 3 pontos ou grave movimento</div>
-
-<!-- gps hint popup (shown until closed) -->
+<!-- gps hint popup (shows until closed) -->
 <div id="gpsHint" class="gps-hint" style="display:none" role="dialog" aria-live="polite">
   <div style="max-width:640px">Dica: ative <strong>Alta precisão</strong> no GPS do seu dispositivo para melhor fix. Clique 3 pontos manualmente ou grave um movimento para mapear a curva.</div>
-  <div style="margin-left:6px">
-    <button id="gpsHintClose">OK</button>
-  </div>
+  <div style="margin-left:6px"><button id="gpsHintClose">OK</button></div>
 </div>
 
-<!-- overlay inside map (bottom-left) -->
+<!-- overlay centered above footer with two lines -->
 <div class="map-overlay" id="mapOverlay" aria-live="polite">
-  <div class="line"><div class="label">Centro:</div><div id="ovCenter" class="value">-</div></div>
-  <div class="line"><div class="label">VR:</div><div id="ovVR" class="value">-</div></div>
-  <div class="line"><div class="label">VS:</div><div id="ovVS" class="value">-</div></div>
-  <div class="line"><div class="label">Raio:</div><div id="ovR" class="value">-</div></div>
-  <div class="line"><div class="label">Δ:</div><div id="ovDelta" class="value">-</div></div>
-  <div class="line"><div id="ovMessage" style="font-size:11px;color:#555">Aguardando 3 pontos ou gravação.</div></div>
+  <div class="row"><div class="sub">Lat - Long:</div></div>
+  <div class="row"><div id="ovCenter" class="txt">-</div></div>
+  <div class="row" style="margin-top:2px;"><div class="sub">Raio - Ângulo:</div></div>
+  <div class="row"><div id="ovRaioAng" class="txt">-</div></div>
 </div>
 
-<!-- discrete footer centered -->
+<!-- footer -->
 <div id="footerApp">Feito com ❤️ por Everton Tezzon Ferreira</div>
 
 <!-- libs -->
@@ -147,7 +141,6 @@
 /* ================== Helpers & Config ================== */
 const TILE_PROVIDER = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const G = 9.81;
-
 function haversineKm(aLat,aLng,bLat,bLng){
   const R=6371; const dLat=(bLat-aLat)*Math.PI/180; const dLon=(bLng-aLng)*Math.PI/180;
   const A = Math.sin(dLat/2)**2 + Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*Math.sin(dLon/2)**2;
@@ -156,21 +149,21 @@ function haversineKm(aLat,aLng,bLat,bLng){
 }
 function floorToNearest5(n){ return Math.max(0, Math.floor(n / 5) * 5); }
 
-/* new setOverlay signature: setOverlay(center, vr, vs, R, delta, message) */
-function setOverlay(center, vr, vs, R, delta, message){
-  document.getElementById('ovCenter').textContent = center ? `${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}` : '-';
-  document.getElementById('ovVR').textContent = (vr !== null && vr !== undefined) ? (vr + ' km/h') : '-';
-  document.getElementById('ovVS').textContent = (vs !== null && vs !== undefined) ? (vs + ' km/h') : '-';
-  document.getElementById('ovR').textContent = R ? `${R.toFixed(2)}` : '-';
-  document.getElementById('ovDelta').textContent = delta ? `${delta.toFixed(2)}°` : '-';
-  document.getElementById('ovMessage').textContent = message || 'Aguardando 3 pontos ou gravação.';
+/* New overlay: two lines only */
+function setOverlayLines(center, R, delta, message){
+  document.getElementById('ovCenter').textContent = center ? `${center.lat.toFixed(6)} - ${center.lng.toFixed(6)}` : '-';
+  document.getElementById('ovRaioAng').textContent = (R ? `${R.toFixed(2)} m` : '-') + '  -  ' + (delta ? `${delta.toFixed(2)}°` : '-');
+  if(message) {
+    // temporarily show message in the overlay subtitle (brief)
+    // We won't block layout; instead we console.log
+    console.log('SafeTurn:', message);
+  }
 }
 
 /* ================== Map init ================== */
 const map = L.map('map', { zoomControl:true }).setView([-21.050964, -50.845963], 15);
 const tileLayer = L.tileLayer(TILE_PROVIDER, { maxZoom:20, crossOrigin:true, errorTileUrl:'/offline-tile.png', attribution:'Esri' }).addTo(map);
 tileLayer.on('tileerror', ()=> console.warn('tile error'));
-
 const recordedGroup = L.layerGroup().addTo(map);
 
 /* ================== State ================== */
@@ -183,7 +176,6 @@ let curveLine = null, curveDecorator = null;
 /* ================== GPS Hint logic ================== */
 const gpsHintEl = document.getElementById('gpsHint');
 const gpsHintCloseBtn = document.getElementById('gpsHintClose');
-// Show popup only if not dismissed before
 if(!localStorage.getItem('safeTurn_gpsHintDismissed')){
   gpsHintEl.style.display = 'flex';
 }
@@ -196,7 +188,7 @@ gpsHintCloseBtn.addEventListener('click', ()=>{
 function onGeoErr(err){
   console.warn('geo err', err);
   const m = err && err.code===1 ? 'Permissão negada' : (err && err.code===2 ? 'Posição indisponível' : 'Erro de geolocalização');
-  setOverlay(null, null, null, null, null, m);
+  setOverlayLines(null, null, null, m);
 }
 function onPos(p){
   const lat = p.coords.latitude, lng = p.coords.longitude;
@@ -214,17 +206,17 @@ function onPos(p){
     }
     redrawRecordingLine();
   }
-  setOverlay(null, null, null, null, null, 'GPS OK');
+  setOverlayLines(null, null, null, 'GPS OK');
 }
 function startWatch(){
-  if(!('geolocation' in navigator)){ setOverlay(null, null, null, null, null, 'Geolocalização não suportada'); return; }
+  if(!('geolocation' in navigator)){ setOverlayLines(null, null, null, 'Geolocalização não suportada'); return; }
   try{
     if(watchId) navigator.geolocation.clearWatch(watchId);
     watchId = navigator.geolocation.watchPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:2000, timeout:20000 });
     navigator.geolocation.getCurrentPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:0, timeout:10000 });
   } catch(e){
     console.error('watch fail', e);
-    setOverlay(null, null, null, null, null, 'Erro ao ativar GPS');
+    setOverlayLines(null, null, null, 'Erro ao ativar GPS');
   }
 }
 startWatch();
@@ -232,7 +224,7 @@ startWatch();
 /* center button */
 document.getElementById('btnCenter').addEventListener('click', ()=>{
   if(liveMarker && liveMarker.getLatLng) { map.setView(liveMarker.getLatLng(), 17); }
-  else setOverlay(null, null, null, null, null, 'GPS ainda não disponível');
+  else setOverlayLines(null, null, null, 'GPS ainda não disponível');
 });
 
 /* ================== Drawing & Recording ================== */
@@ -254,18 +246,18 @@ map.on('click', e=>{
   manualMarkers.push(mk);
   points.push(L.latLng(e.latlng.lat, e.latlng.lng));
   if(points.length === 3) plotCurvePoints(points[0], points[1], points[2]);
-  else setOverlay(null, null, null, null, null, `Pontos: ${points.length} (adicione ${3-points.length})`);
+  else setOverlayLines(null, null, null, `Pontos: ${points.length} (adicione ${3-points.length})`);
 });
 
 /* undo / clear */
 document.getElementById('btnUndo').addEventListener('click', ()=>{
-  if(manualMarkers.length){ try{ map.removeLayer(manualMarkers.pop()); }catch(e){} points.pop(); setOverlay(null, null, null, null, null, points.length ? `Pontos: ${points.length}` : 'Aguardando pontos'); }
-  else setOverlay(null, null, null, null, null, 'Nada para desfazer');
+  if(manualMarkers.length){ try{ map.removeLayer(manualMarkers.pop()); }catch(e){} points.pop(); setOverlayLines(null, null, null, points.length ? `Pontos: ${points.length}` : 'Aguardando pontos'); }
+  else setOverlayLines(null, null, null, 'Nada para desfazer');
 });
 document.getElementById('btnClear').addEventListener('click', ()=>{
   try{ recordedGroup.clearLayers(); }catch(e){}
   manualMarkers = []; points = []; track = []; try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){} trackLine=null;
-  setOverlay(null, null, null, null, null, 'Aguardando pontos ou gravação');
+  setOverlayLines(null, null, null, 'Aguardando pontos ou gravação');
 });
 
 /* record toggle */
@@ -275,7 +267,7 @@ document.getElementById('btnRecord').addEventListener('click', ()=>{
   if(recording){
     track = []; try{ if(trackLine) recordedGroup.removeLayer(trackLine);}catch(e){} trackLine=null;
     if(liveMarker && liveMarker.getLatLng) track.push({lat: liveMarker.getLatLng().lat, lng: liveMarker.getLatLng().lng, ts: Date.now()});
-    setOverlay(null, null, null, null, null, 'Gravando (aguardando movimento)');
+    setOverlayLines(null, null, null, 'Gravando (aguardando movimento)');
   } else {
     if(track.length < 3){ alert('Track curto: registre um percurso maior ou adicione 3 pontos manualmente.'); redrawRecordingLine(); return; }
     const sel = selectThreeFromTrack(track);
@@ -316,7 +308,7 @@ function clearCurveOnly(){
   try{ if(curveDecorator) recordedGroup.removeLayer(curveDecorator);}catch(e){}
   manualMarkers.forEach(m=>{ try{ map.removeLayer(m);}catch(e){} });
   manualMarkers = []; curveLine = null; curveDecorator = null; points = [];
-  setOverlay(null, null, null, null, null, 'Aguardando pontos ou gravação');
+  setOverlayLines(null, null, null, 'Aguardando pontos ou gravação');
 }
 
 function plotCurvePoints(p1,p2,p3){
@@ -337,18 +329,18 @@ function plotCurvePoints(p1,p2,p3){
   points = [P1,P2,P3];
   const geom = calcularGeometria();
   if(geom) {
-    setOverlay(geom.center, geom.vrecom_kmh, geom.vs_kmh, geom.R, geom.deltaDeg, 'Curva calculada');
+    setOverlayLines(geom.center, geom.R, geom.deltaDeg, 'Curva calculada');
   }
 }
 
 /* core calculation returns center */
 function calcularGeometria(){
-  if(!points || points.length < 3){ setOverlay(null, null, null, null, null, 'Aguardando 3 pontos'); return null; }
+  if(!points || points.length < 3){ setOverlayLines(null, null, null, 'Aguardando 3 pontos'); return null; }
   const p1 = points[0], p2 = points[1], p3 = points[2];
   const c = haversineKm(p1.lat,p1.lng,p3.lat,p3.lng) * 1000;
   const midLat = (p1.lat + p3.lat)/2, midLng = (p1.lng + p3.lng)/2;
   const s = haversineKm(p2.lat,p2.lng, midLat, midLng) * 1000;
-  if(s === 0){ setOverlay(null, null, null, null, null, 'Sagita zero — escolha outros pontos'); return null; }
+  if(s === 0){ setOverlayLines(null, null, null, 'Sagita zero — escolha outros pontos'); return null; }
   const R = (c*c)/(8*s) + s/2;
   const theta = 2 * Math.asin(Math.min(1, c/(2*R)));
   const deltaDeg = theta * 180/Math.PI;
@@ -378,7 +370,7 @@ function calcularGeometria(){
   })(p1,p2,p3);
 
   const res = { R, deltaDeg, arcLen, s, c, vrecom_kmh_raw, vrecom_kmh, vs_kmh, center };
-  setOverlay(res.center, res.vrecom_kmh, res.vs_kmh, res.R, res.deltaDeg, 'Curva calculada');
+  setOverlayLines(res.center, res.R, res.deltaDeg, 'Curva calculada');
   return res;
 }
 
@@ -398,7 +390,7 @@ document.getElementById('btnWA').addEventListener('click', ()=>{
   window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
 });
 
-/* ========== PNG export: capture map canvas + overlay & centered footer ========== */
+/* ========== PNG export: capture map canvas + app name + centered bottom box ========== */
 document.getElementById('btnPNG').addEventListener('click', async ()=>{
   const geom = calcularGeometria();
   if(!geom){ alert('Defina curva antes de gerar PNG.'); return; }
@@ -413,7 +405,7 @@ document.getElementById('btnPNG').addEventListener('click', async ()=>{
       leafletImage(map, function(err, mapCanvas){
         if(err || !mapCanvas) return reject(err || new Error('leaflet-image falhou'));
         try{
-          // create final canvas same size as mapCanvas
+          // final canvas
           const final = document.createElement('canvas');
           final.width = mapCanvas.width;
           final.height = mapCanvas.height;
@@ -422,31 +414,35 @@ document.getElementById('btnPNG').addEventListener('click', async ()=>{
           // draw map
           ctx.drawImage(mapCanvas, 0, 0);
 
-          // overlay box scaled to canvas (compact)
-          const padding = Math.round(final.width * 0.03);
-          const boxW = Math.max(140, Math.round(final.width * 0.18)); // 18% width minimum 140px
-          const boxX = padding;
-          const boxH = Math.round(final.height * 0.14);
-          const boxY = final.height - padding - boxH - 18; // leave extra 18px for footer
-          ctx.fillStyle = 'rgba(255,255,255,0.92)';
-          roundRect(ctx, boxX, boxY, boxW, boxH, 8, true, false);
+          // draw app name top-left (so it appears on the PNG)
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(10, 10, 110, 34);
+          ctx.fillStyle = '#fff';
+          ctx.font = Math.max(14, Math.round(final.width*0.02)) + 'px sans-serif';
+          ctx.fillText('Safe Turn', 18, 34);
 
-          // text inside panel (responsive sizes)
+          // centered box above footer (two lines)
+          const boxW = Math.min(final.width - 40, Math.max(260, Math.round(final.width * 0.6)));
+          const boxH = Math.round(final.height * 0.12);
+          const boxX = (final.width - boxW) / 2;
+          const boxY = final.height - boxH - 36; // leave space for footer
+
+          ctx.fillStyle = 'rgba(255,255,255,0.96)';
+          roundRect(ctx, boxX, boxY, boxW, boxH, 12, true, false);
+
+          // text inside box (centered)
           ctx.fillStyle = '#111';
-          ctx.font = Math.max(10, Math.round(final.width*0.014)) + 'px sans-serif';
-          const lineStartX = boxX + 8;
-          let y = boxY + 18;
-          ctx.fillText(`Centro: ${geom.center.lat.toFixed(6)}, ${geom.center.lng.toFixed(6)}`, lineStartX, y); y += 18;
-          ctx.fillText(`VR: ${geom.vrecom_kmh} km/h`, lineStartX, y); y += 18;
-          ctx.fillText(`VS: ${geom.vs_kmh} km/h`, lineStartX, y); y += 18;
-          ctx.fillText(`Raio: ${geom.R.toFixed(2)} m`, lineStartX, y); y += 18;
-          ctx.fillText(`Δ: ${geom.deltaDeg.toFixed(2)}°`, lineStartX, y);
+          ctx.textAlign = 'center';
+          ctx.font = Math.max(12, Math.round(final.width*0.016)) + 'px sans-serif';
+          ctx.fillText(`${geom.center.lat.toFixed(6)} - ${geom.center.lng.toFixed(6)}`, final.width/2, boxY + Math.round(boxH*0.43));
+          ctx.fillText(`${geom.R.toFixed(2)} m  -  ${geom.deltaDeg.toFixed(2)}°`, final.width/2, boxY + Math.round(boxH*0.78));
+          ctx.textAlign = 'left';
 
-          // centered discrete footer (above bottom)
+          // footer centered
           ctx.fillStyle = 'rgba(255,255,255,0.92)';
           ctx.font = Math.max(10, Math.round(final.width*0.012)) + 'px sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', final.width / 2, final.height - 10);
+          ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', final.width / 2, final.height - 12);
           ctx.textAlign = 'left';
 
           // download
@@ -466,14 +462,16 @@ document.getElementById('btnPNG').addEventListener('click', async ()=>{
   } catch(e){
     console.warn('capture failed, fallback vector-only drawing', e);
     try{
+      // fallback: draw minimal vector version matching layout
       const size = map.getSize();
       const final = document.createElement('canvas');
       final.width = size.x; final.height = size.y;
       const ctx = final.getContext('2d');
-      // background
+
+      // simple background
       ctx.fillStyle = '#e9eef2'; ctx.fillRect(0,0,final.width,final.height);
 
-      // draw track (if any)
+      // draw track and points (if present)
       if(track && track.length){
         ctx.strokeStyle = 'red'; ctx.lineWidth = 4; ctx.beginPath();
         for(let i=0;i<track.length;i++){
@@ -482,8 +480,6 @@ document.getElementById('btnPNG').addEventListener('click', async ()=>{
         }
         ctx.stroke();
       }
-
-      // curve points & arrow (if any)
       if(points && points.length === 3){
         ctx.setLineDash([8,6]); ctx.strokeStyle = '#8e44ad'; ctx.lineWidth = 3;
         ctx.beginPath();
@@ -501,24 +497,30 @@ document.getElementById('btnPNG').addEventListener('click', async ()=>{
         }
       }
 
-      // overlay panel (bottom-left smaller)
-      const padding = Math.round(final.width * 0.03);
-      const boxW = Math.max(140, Math.round(final.width * 0.18));
-      const boxX = padding;
-      const boxH = Math.round(final.height * 0.14);
-      const boxY = final.height - padding - boxH - 18;
-      ctx.fillStyle = 'rgba(255,255,255,0.92)'; roundRect(ctx, boxX, boxY, boxW, boxH, 8, true, false);
-      ctx.fillStyle = '#111'; ctx.font = '14px sans-serif';
-      ctx.fillText(`Centro: ${geom.center.lat.toFixed(6)}, ${geom.center.lng.toFixed(6)}`, boxX + 8, boxY + 24);
-      ctx.fillStyle = '#444'; ctx.font = '13px sans-serif';
-      ctx.fillText(`VR: ${geom.vrecom_kmh} km/h`, boxX + 8, boxY + 44);
-      ctx.fillText(`VS: ${geom.vs_kmh} km/h`, boxX + 8, boxY + 62);
-      ctx.fillText(`Raio: ${geom.R.toFixed(2)} m`, boxX + 8, boxY + 80);
-      ctx.fillText(`Δ: ${geom.deltaDeg.toFixed(2)}°`, boxX + 8, boxY + 98);
+      // app title top-left
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(10,10,110,34);
+      ctx.fillStyle = '#fff'; ctx.font = '18px sans-serif'; ctx.fillText('Safe Turn', 18, 34);
 
-      // centered footer
+      // centered box above footer
+      const boxW = Math.min(final.width - 40, Math.max(260, Math.round(final.width * 0.6)));
+      const boxH = Math.round(final.height * 0.12);
+      const boxX = (final.width - boxW) / 2;
+      const boxY = final.height - boxH - 36;
+      ctx.fillStyle = 'rgba(255,255,255,0.96)'; roundRect(ctx, boxX, boxY, boxW, boxH, 12, true, false);
+      ctx.fillStyle = '#111'; ctx.textAlign = 'center';
+      // if we have geom values show them, else placeholders
+      const cLat = geom && geom.center ? geom.center.lat.toFixed(6) : '-';
+      const cLng = geom && geom.center ? geom.center.lng.toFixed(6) : '-';
+      const R = geom ? geom.R.toFixed(2) : '-';
+      const d = geom ? geom.deltaDeg.toFixed(2) : '-';
+      ctx.font = '14px sans-serif';
+      ctx.fillText(`${cLat} - ${cLng}`, final.width/2, boxY + Math.round(boxH*0.43));
+      ctx.fillText(`${R} m  -  ${d}°`, final.width/2, boxY + Math.round(boxH*0.78));
+      ctx.textAlign = 'left';
+
+      // footer
       ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', final.width / 2, final.height - 10);
+      ctx.fillText('Feito com ❤️ por Everton Tezzon Ferreira', final.width / 2, final.height - 12);
       ctx.textAlign = 'left';
 
       final.toBlob(function(blob){
@@ -549,7 +551,7 @@ function roundRect(ctx, x, y, w, h, r, fill, stroke){
 }
 
 /* init overlay defaults */
-setOverlay(null, null, null, null, null, 'Aguardando 3 pontos ou gravação');
+setOverlayLines(null, null, null, 'Aguardando 3 pontos ou gravação');
 
 /* expose for debug */
 window.SafeTurn = { calcularGeometria };
